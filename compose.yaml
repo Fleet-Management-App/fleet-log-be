@@ -1,0 +1,16 @@
+# Local development database. Start with `docker compose up -d`.
+# Host port 5433 rather than 5432, so it doesn't clash with a locally installed PostgreSQL.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: fleet_log
+      POSTGRES_USER: fleet_log
+      POSTGRES_PASSWORD: fleet_log
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+volumes:
+  postgres-data:
