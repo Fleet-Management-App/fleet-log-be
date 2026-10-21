@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="846" viewBox="0 0 768 846" font-family="Segoe UI, Arial, sans-serif">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker></defs>
+<rect width="768" height="846" fill="#ffffff"/>
+<text x="24" y="50" font-size="22" font-weight="700" fill="#0f172a">US-03: Report a Vehicle Problem</text>
+<text x="24" y="74" font-size="13" fill="#64748b">Specification: SPEC-03: Problem Reports</text>
+<rect x="24" y="102" width="240" height="656" fill="#eff6ff" stroke="#cbd5e1"/>
+<rect x="24" y="102" width="240" height="38" fill="#2563eb"/>
+<text x="144.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">Driver</text>
+<rect x="264" y="102" width="240" height="656" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="264" y="102" width="240" height="38" fill="#475569"/>
+<text x="384.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">FleetLog (system)</text>
+<rect x="504" y="102" width="240" height="656" fill="#fffbeb" stroke="#cbd5e1"/>
+<rect x="504" y="102" width="240" height="38" fill="#d97706"/>
+<text x="624.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">Fleet Manager</text>
+<path d="M144.0,192.0 L144.0,232.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,311.0 L144.0,351.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,441.0 L144.0,461.0 L384.0,461.0 L384.0,481.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M384.0,554.0 L384.0,574.0 L624.0,574.0 L624.0,594.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M624.0,650.0 L624.0,690.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<circle cx="144.0" cy="179.0" r="12" fill="#0f172a"/>
+<rect x="46.0" y="232.0" width="196" height="79" rx="10" fill="#fff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="144.0" y="262.0" font-size="13" fill="#0f172a" text-anchor="middle">Choose &quot;Report a problem&quot;</text>
+<text x="144.0" y="279.0" font-size="13" fill="#0f172a" text-anchor="middle">and pick any company</text>
+<text x="144.0" y="296.0" font-size="13" fill="#0f172a" text-anchor="middle">vehicle</text>
+<rect x="186.0" y="223.0" width="50" height="18" rx="4" fill="#b91c1c"/>
+<text x="211.0" y="236.0" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" font-family="Consolas, monospace">BR-08</text>
+<rect x="46.0" y="351.0" width="196" height="90" rx="10" fill="#fff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="144.0" y="375.0" font-size="13" fill="#0f172a" text-anchor="middle">Pick a category</text>
+<text x="144.0" y="392.0" font-size="13" fill="#0f172a" text-anchor="middle">(check-engine light,</text>
+<text x="144.0" y="409.0" font-size="13" fill="#0f172a" text-anchor="middle">noise, damage...) and</text>
+<text x="144.0" y="426.0" font-size="13" fill="#0f172a" text-anchor="middle">describe it</text>
+<rect x="286.0" y="481.0" width="196" height="73" rx="22" fill="#e2e8f0" stroke="#475569" stroke-width="2.2"/>
+<text x="384.0" y="505.0" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Report saved: Open</text>
+<text x="384.0" y="522.0" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">(vehicle, reporter,</text>
+<text x="384.0" y="539.0" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">timestamp)</text>
+<rect x="526.0" y="594.0" width="196" height="56" rx="10" fill="#fff" stroke="#d97706" stroke-width="1.6"/>
+<text x="624.0" y="618.0" font-size="13" fill="#0f172a" text-anchor="middle">Sees the report in the</text>
+<text x="624.0" y="635.0" font-size="13" fill="#0f172a" text-anchor="middle">open problem reports</text>
+<circle cx="624.0" cy="704.0" r="13" fill="#fff" stroke="#0f172a" stroke-width="2"/>
+<circle cx="624.0" cy="704.0" r="8" fill="#0f172a"/>
+<text x="624.0" y="734.5" font-size="13" fill="#475569" text-anchor="middle">Reviewed and resolved in</text>
+<text x="624.0" y="751.5" font-size="13" fill="#475569" text-anchor="middle">US-09</text>
+<text x="24" y="784" font-size="13" font-weight="700" fill="#0f172a">Business rules (02. Business Rules &amp; Validations)</text>
+<text x="24" y="802" font-size="12" font-weight="700" fill="#b91c1c" font-family="Consolas, monospace">BR-08</text>
+<text x="84" y="802" font-size="12" fill="#334155">A problem report can be filed against any vehicle</text>
+</svg>

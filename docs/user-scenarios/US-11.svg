@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="528" height="741" viewBox="0 0 528 741" font-family="Segoe UI, Arial, sans-serif">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker></defs>
+<rect width="528" height="741" fill="#ffffff"/>
+<text x="24" y="50" font-size="22" font-weight="700" fill="#0f172a">US-11: View Statistics</text>
+<text x="24" y="74" font-size="13" fill="#64748b">Specification: SPEC-06: Statistics</text>
+<rect x="24" y="102" width="240" height="599" fill="#fffbeb" stroke="#cbd5e1"/>
+<rect x="24" y="102" width="240" height="38" fill="#d97706"/>
+<text x="144.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">Fleet Manager</text>
+<rect x="264" y="102" width="240" height="599" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="264" y="102" width="240" height="38" fill="#475569"/>
+<text x="384.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">FleetLog (system)</text>
+<path d="M144.0,192.0 L144.0,232.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,271.0 L144.0,311.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,384.0 L144.0,404.0 L384.0,404.0 L384.0,424.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M384.0,497.0 L384.0,517.0 L144.0,517.0 L144.0,537.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,593.0 L144.0,633.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<circle cx="144.0" cy="179.0" r="12" fill="#0f172a"/>
+<rect x="46.0" y="232.0" width="196" height="39" rx="10" fill="#fff" stroke="#d97706" stroke-width="1.6"/>
+<text x="144.0" y="256.0" font-size="13" fill="#0f172a" text-anchor="middle">Open Statistics</text>
+<rect x="46.0" y="311.0" width="196" height="73" rx="10" fill="#fff" stroke="#d97706" stroke-width="1.6"/>
+<text x="144.0" y="335.0" font-size="13" fill="#0f172a" text-anchor="middle">Choose the grouping</text>
+<text x="144.0" y="352.0" font-size="13" fill="#0f172a" text-anchor="middle">(vehicle, driver or</text>
+<text x="144.0" y="369.0" font-size="13" fill="#0f172a" text-anchor="middle">month) and the month</text>
+<rect x="286.0" y="424.0" width="196" height="73" rx="10" fill="#fff" stroke="#475569" stroke-width="1.6"/>
+<text x="384.0" y="448.0" font-size="13" fill="#0f172a" text-anchor="middle">Sum fuel + service cost</text>
+<text x="384.0" y="465.0" font-size="13" fill="#0f172a" text-anchor="middle">and kilometres driven for</text>
+<text x="384.0" y="482.0" font-size="13" fill="#0f172a" text-anchor="middle">the company</text>
+<rect x="46.0" y="537.0" width="196" height="56" rx="10" fill="#fff" stroke="#d97706" stroke-width="1.6"/>
+<text x="144.0" y="561.0" font-size="13" fill="#0f172a" text-anchor="middle">Read totals per vehicle /</text>
+<text x="144.0" y="578.0" font-size="13" fill="#0f172a" text-anchor="middle">driver / month</text>
+<circle cx="144.0" cy="647.0" r="13" fill="#fff" stroke="#0f172a" stroke-width="2"/>
+<circle cx="144.0" cy="647.0" r="8" fill="#0f172a"/>
+</svg>

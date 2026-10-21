@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="528" height="786" viewBox="0 0 528 786" font-family="Segoe UI, Arial, sans-serif">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker></defs>
+<rect width="528" height="786" fill="#ffffff"/>
+<text x="24" y="50" font-size="22" font-weight="700" fill="#0f172a">US-13: Export to Excel</text>
+<text x="24" y="74" font-size="13" fill="#64748b">Specification: SPEC-07: Financial History &amp; Excel Export  ·  Fleet Manager has the same access</text>
+<rect x="24" y="102" width="240" height="644" fill="#ecfdf5" stroke="#cbd5e1"/>
+<rect x="24" y="102" width="240" height="38" fill="#059669"/>
+<text x="144.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">Accountant</text>
+<rect x="264" y="102" width="240" height="644" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="264" y="102" width="240" height="38" fill="#475569"/>
+<text x="384.0" y="127" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">FleetLog (system)</text>
+<path d="M144.0,192.0 L144.0,232.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,271.0 L144.0,311.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,350.0 L144.0,390.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,429.0 L144.0,449.0 L384.0,449.0 L384.0,469.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M384.0,559.0 L384.0,579.0 L144.0,579.0 L144.0,599.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<path d="M144.0,638.0 L144.0,678.0" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#arr)"/>
+<circle cx="144.0" cy="179.0" r="12" fill="#0f172a"/>
+<rect x="46.0" y="232.0" width="196" height="39" rx="10" fill="#fff" stroke="#059669" stroke-width="1.6"/>
+<text x="144.0" y="256.0" font-size="13" fill="#0f172a" text-anchor="middle">Open Financial history</text>
+<rect x="46.0" y="311.0" width="196" height="39" rx="10" fill="#fff" stroke="#059669" stroke-width="1.6"/>
+<text x="144.0" y="335.0" font-size="13" fill="#0f172a" text-anchor="middle">Set the period</text>
+<rect x="46.0" y="390.0" width="196" height="39" rx="10" fill="#fff" stroke="#059669" stroke-width="1.6"/>
+<text x="144.0" y="414.0" font-size="13" fill="#0f172a" text-anchor="middle">Click &quot;Export to Excel&quot;</text>
+<rect x="286.0" y="469.0" width="196" height="90" rx="10" fill="#fff" stroke="#475569" stroke-width="1.6"/>
+<text x="384.0" y="493.0" font-size="13" fill="#0f172a" text-anchor="middle">Build an .xlsx with</text>
+<text x="384.0" y="510.0" font-size="13" fill="#0f172a" text-anchor="middle">trips, fuel fills and</text>
+<text x="384.0" y="527.0" font-size="13" fill="#0f172a" text-anchor="middle">service costs for the</text>
+<text x="384.0" y="544.0" font-size="13" fill="#0f172a" text-anchor="middle">period</text>
+<rect x="46.0" y="599.0" width="196" height="39" rx="10" fill="#fff" stroke="#059669" stroke-width="1.6"/>
+<text x="144.0" y="623.0" font-size="13" fill="#0f172a" text-anchor="middle">Download the file</text>
+<circle cx="144.0" cy="692.0" r="13" fill="#fff" stroke="#0f172a" stroke-width="2"/>
+<circle cx="144.0" cy="692.0" r="8" fill="#0f172a"/>
+</svg>
