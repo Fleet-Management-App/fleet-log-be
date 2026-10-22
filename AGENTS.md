@@ -35,6 +35,6 @@
   - Use mappers (mapstruct) to map the data structures.
   - Write meaningful tests for edge case business logic.
   - Separate the business logic from the presentation logic.
-  - Use the MSSQL data structures.
+  - Use the PostgreSQL data structures.
   - Write comments for the code that is not self-explanatory.
 
