@@ -40,15 +40,15 @@ class OrganizationService(
 
 	/** Any signed-in user can create an organization; they become its first Fleet Manager and switch to it. */
 	fun create(request: CreateOrganizationRequest): AuthTokenResponse {
-		val user = userRepository.findById(currentUser.userId()).orElseThrow { NotFoundException("Account not found") }
+		val user = userRepository.findById(currentUser.getUserId()).orElseThrow { NotFoundException("Account not found") }
 		val organization = organizationRepository.save(Organization(name = request.name.trim()))
 		val membership = membershipRepository.save(Membership(user = user, organization = organization, role = Role.FLEET_MANAGER))
 		return tokenService.issue(user, membership)
 	}
 
 	@Transactional(readOnly = true)
-	fun members(): List<MemberResponse> =
-		membershipRepository.findAllByOrganizationIdOrderByCreatedAt(currentUser.tenantId())
+	fun getMembers(): List<MemberResponse> =
+		membershipRepository.findAllByOrganizationIdOrderByCreatedAt(currentUser.getTenantId())
 			.map(organizationMapper::toMemberResponse)
 
 	fun changeRole(userId: UUID, request: ChangeRoleRequest): MemberResponse {
@@ -66,7 +66,7 @@ class OrganizationService(
 	}
 
 	fun invite(request: CreateInvitationRequest): InvitationResponse {
-		val tenantId = currentUser.tenantId()
+		val tenantId = currentUser.getTenantId()
 		val email = normalizeEmail(request.email)
 		val existingUser = userRepository.findByEmail(email)
 		if (existingUser != null && membershipRepository.existsByUserIdAndOrganizationId(existingUser.id, tenantId)) {
@@ -80,26 +80,26 @@ class OrganizationService(
 				organization = organizationRepository.getReferenceById(tenantId),
 				email = email,
 				role = request.role,
-				invitedBy = userRepository.getReferenceById(currentUser.userId()),
+				invitedBy = userRepository.getReferenceById(currentUser.getUserId()),
 			),
 		)
 		return organizationMapper.toInvitationResponse(invitation)
 	}
 
 	@Transactional(readOnly = true)
-	fun pendingInvitations(): List<InvitationResponse> =
-		invitationRepository.findAllByOrganizationIdAndStatusOrderByCreatedAt(currentUser.tenantId(), InvitationStatus.PENDING)
+	fun getPendingInvitations(): List<InvitationResponse> =
+		invitationRepository.findAllByOrganizationIdAndStatusOrderByCreatedAt(currentUser.getTenantId(), InvitationStatus.PENDING)
 			.map(organizationMapper::toInvitationResponse)
 
 	fun revokeInvitation(invitationId: UUID) {
-		val invitation = invitationRepository.findByIdAndOrganizationId(invitationId, currentUser.tenantId())
+		val invitation = invitationRepository.findByIdAndOrganizationId(invitationId, currentUser.getTenantId())
 			?: throw NotFoundException("Invitation not found")
 		if (invitation.status != InvitationStatus.PENDING) throw ConflictException("Only a pending invitation can be revoked")
 		invitation.status = InvitationStatus.REVOKED
 	}
 
 	private fun findMember(userId: UUID): Membership =
-		membershipRepository.findByUserIdAndOrganizationId(userId, currentUser.tenantId())
+		membershipRepository.findByUserIdAndOrganizationId(userId, currentUser.getTenantId())
 			?: throw NotFoundException("Member not found")
 
 	// Not in the Business Rules page yet (gap to flag): without a Fleet Manager nobody could manage the organization

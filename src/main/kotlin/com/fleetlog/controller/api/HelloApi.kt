@@ -12,6 +12,6 @@ interface HelloApi {
 
 	@Operation(summary = "Return a hello message")
 	@GetMapping
-	fun hello(): HelloResponse
+	fun getHello(): HelloResponse
 
 }

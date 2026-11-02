@@ -15,13 +15,13 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class ApiExceptionHandler : ResponseEntityExceptionHandler() {
 
 	@ExceptionHandler(NotFoundException::class)
-	fun notFound(e: NotFoundException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.message)
+	fun handleNotFound(e: NotFoundException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.message)
 
 	@ExceptionHandler(ConflictException::class)
-	fun conflict(e: ConflictException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.message)
+	fun handleConflict(e: ConflictException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.message)
 
 	@ExceptionHandler(BadCredentialsException::class)
-	fun badCredentials(e: BadCredentialsException): ProblemDetail =
+	fun handleBadCredentials(e: BadCredentialsException): ProblemDetail =
 		ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Wrong e-mail or password")
 
 }

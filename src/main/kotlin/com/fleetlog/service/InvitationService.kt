@@ -45,7 +45,7 @@ class InvitationService(
 	}
 
 	private fun findOwnPendingInvitation(invitationId: UUID): Pair<AppUser, Invitation> {
-		val user = userRepository.findById(currentUser.userId()).orElseThrow { NotFoundException("Account not found") }
+		val user = userRepository.findById(currentUser.getUserId()).orElseThrow { NotFoundException("Account not found") }
 		// Someone else's invitation answers 404 like a missing one, so ids can't be probed
 		val invitation = invitationRepository.findWithOrganizationById(invitationId)
 			?.takeIf { it.email == user.email }

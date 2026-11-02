@@ -21,8 +21,8 @@ class AccountService(
 	private val organizationMapper: OrganizationMapper,
 ) {
 
-	fun me(): MeResponse {
-		val principal = currentUser.principal()
+	fun getMe(): MeResponse {
+		val principal = currentUser.getPrincipal()
 		val user = userRepository.findById(principal.userId).orElseThrow { NotFoundException("Account not found") }
 		val memberships = membershipRepository.findAllByUserIdOrderByCreatedAt(user.id)
 		val invitations = invitationRepository.findAllByEmailAndStatusOrderByCreatedAt(user.email, InvitationStatus.PENDING)

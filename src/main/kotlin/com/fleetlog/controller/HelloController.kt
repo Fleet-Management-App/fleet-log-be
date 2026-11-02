@@ -7,6 +7,6 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class HelloController : HelloApi {
 
-	override fun hello() = HelloResponse("Hello from FleetLog")
+	override fun getHello() = HelloResponse("Hello from FleetLog")
 
 }

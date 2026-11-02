@@ -3,9 +3,9 @@ package com.fleetlog.controller
 import com.fleetlog.BaseFleetLogBeIntegrationTest
 import com.fleetlog.TestApi
 import com.fleetlog.TestApi.PASSWORD
-import com.fleetlog.TestApi.bearer
-import com.fleetlog.TestApi.json
-import com.fleetlog.TestApi.uniqueEmail
+import com.fleetlog.TestApi.withBearer
+import com.fleetlog.TestApi.withJson
+import com.fleetlog.TestApi.generateUniqueEmail
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -19,8 +19,8 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 
 	describe("POST /api/auth/sign-up") {
 		it("creates an account without an organization") {
-			val email = uniqueEmail()
-			val me = TestApi.me(TestApi.signUp(email, "Jana Nováková"))
+			val email = generateUniqueEmail()
+			val me = TestApi.getMe(TestApi.signUp(email, "Jana Nováková"))
 
 			me["email"] shouldBe email
 			me["fullName"] shouldBe "Jana Nováková"
@@ -29,10 +29,10 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("refuses an e-mail that is already used, whatever its letter case") {
-			val email = uniqueEmail()
+			val email = generateUniqueEmail()
 			TestApi.signUp(email)
 
-			Given { json(mapOf("email" to email.uppercase(), "password" to PASSWORD, "fullName" to "Copy")) } When {
+			Given { withJson(mapOf("email" to email.uppercase(), "password" to PASSWORD, "fullName" to "Copy")) } When {
 				post("/api/auth/sign-up")
 			} Then {
 				statusCode(409)
@@ -40,7 +40,7 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("refuses a password shorter than 8 characters") {
-			Given { json(mapOf("email" to uniqueEmail(), "password" to "short", "fullName" to "X")) } When {
+			Given { withJson(mapOf("email" to generateUniqueEmail(), "password" to "short", "fullName" to "X")) } When {
 				post("/api/auth/sign-up")
 			} Then {
 				statusCode(400)
@@ -50,17 +50,17 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 
 	describe("POST /api/auth/login") {
 		it("returns a token for the right password") {
-			val email = uniqueEmail()
+			val email = generateUniqueEmail()
 			TestApi.signUp(email)
 
-			TestApi.me(TestApi.login(email))["email"] shouldBe email
+			TestApi.getMe(TestApi.login(email))["email"] shouldBe email
 		}
 
 		it("returns 401 for a wrong password") {
-			val email = uniqueEmail()
+			val email = generateUniqueEmail()
 			TestApi.signUp(email)
 
-			Given { json(mapOf("email" to email, "password" to "wrong-password")) } When {
+			Given { withJson(mapOf("email" to email, "password" to "wrong-password")) } When {
 				post("/api/auth/login")
 			} Then {
 				statusCode(401)
@@ -68,7 +68,7 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("returns 401 for an unknown e-mail") {
-			Given { json(mapOf("email" to uniqueEmail(), "password" to PASSWORD)) } When {
+			Given { withJson(mapOf("email" to generateUniqueEmail(), "password" to PASSWORD)) } When {
 				post("/api/auth/login")
 			} Then {
 				statusCode(401)
@@ -76,11 +76,11 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("makes the first organization the user joined active") {
-			val email = uniqueEmail()
+			val email = generateUniqueEmail()
 			val first = TestApi.createOrganization(TestApi.signUp(email), "First")
 			TestApi.createOrganization(first, "Second")
 
-			TestApi.activeOrganizationId(TestApi.login(email)) shouldBe TestApi.activeOrganizationId(first)
+			TestApi.getActiveOrganizationId(TestApi.login(email)) shouldBe TestApi.getActiveOrganizationId(first)
 		}
 	}
 
@@ -90,30 +90,30 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("returns 401 for a forged token") {
-			Given { bearer("not.a.jwt") } When { get("/api/me") } Then { statusCode(401) }
+			Given { withBearer("not.a.jwt") } When { get("/api/me") } Then { statusCode(401) }
 		}
 	}
 
 	describe("POST /api/auth/switch-organization") {
 		it("switches to another organization of the caller") {
-			val first = TestApi.fleetManagerOfNewOrganization()
+			val first = TestApi.createFleetManagerOfNewOrganization()
 			val second = TestApi.createOrganization(first, "Second")
-			val secondId = TestApi.activeOrganizationId(second)
+			val secondId = TestApi.getActiveOrganizationId(second)
 
-			val switched: String = Given { bearer(first).json(mapOf("organizationId" to secondId)) } When {
+			val switched: String = Given { withBearer(first).withJson(mapOf("organizationId" to secondId)) } When {
 				post("/api/auth/switch-organization")
 			} Then {
 				statusCode(200)
 			} Extract { path("accessToken") }
 
-			TestApi.activeOrganizationId(switched) shouldBe secondId
+			TestApi.getActiveOrganizationId(switched) shouldBe secondId
 		}
 
 		it("returns 403 for an organization the caller doesn't belong to") {
 			val stranger = TestApi.signUp()
-			val otherOrganizationId = TestApi.activeOrganizationId(TestApi.fleetManagerOfNewOrganization())
+			val otherOrganizationId = TestApi.getActiveOrganizationId(TestApi.createFleetManagerOfNewOrganization())
 
-			Given { bearer(stranger).json(mapOf("organizationId" to otherOrganizationId)) } When {
+			Given { withBearer(stranger).withJson(mapOf("organizationId" to otherOrganizationId)) } When {
 				post("/api/auth/switch-organization")
 			} Then {
 				statusCode(403)
@@ -121,7 +121,7 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 		}
 
 		it("returns 403 for an organization that doesn't exist") {
-			Given { bearer(TestApi.signUp()).json(mapOf("organizationId" to UUID.randomUUID())) } When {
+			Given { withBearer(TestApi.signUp()).withJson(mapOf("organizationId" to UUID.randomUUID())) } When {
 				post("/api/auth/switch-organization")
 			} Then {
 				statusCode(403)

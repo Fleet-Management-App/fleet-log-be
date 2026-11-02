@@ -41,13 +41,13 @@ class DemoDataInitializer(
 		if (userRepository.existsByEmail("jana@demo.fleetlog.app")) return
 
 		val passwordHash = requireNotNull(passwordEncoder.encode(DEMO_PASSWORD))
-		fun user(login: String, name: String) =
+		fun createUser(login: String, name: String) =
 			userRepository.save(AppUser(email = "$login@demo.fleetlog.app", passwordHash = passwordHash, fullName = name))
 
-		val jana = user("jana", "Jana Nováková")
-		val petr = user("petr", "Petr Svoboda")
-		val eva = user("eva", "Eva Dvořáková")
-		val tomas = user("tomas", "Tomáš Král")
+		val jana = createUser("jana", "Jana Nováková")
+		val petr = createUser("petr", "Petr Svoboda")
+		val eva = createUser("eva", "Eva Dvořáková")
+		val tomas = createUser("tomas", "Tomáš Král")
 
 		val demoFleet = organizationRepository.save(Organization(name = "Demo Fleet s.r.o."))
 		val horska = organizationRepository.save(Organization(name = "Horská doprava a.s."))

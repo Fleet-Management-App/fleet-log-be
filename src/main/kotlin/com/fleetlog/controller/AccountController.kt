@@ -9,6 +9,6 @@ class AccountController(
 	private val accountService: AccountService,
 ) : AccountApi {
 
-	override fun me() = accountService.me()
+	override fun getMe() = accountService.getMe()
 
 }

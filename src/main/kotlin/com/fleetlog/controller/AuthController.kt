@@ -19,6 +19,6 @@ class AuthController(
 	override fun login(request: LoginRequest) = authService.login(request)
 
 	override fun switchOrganization(request: SwitchOrganizationRequest) =
-		authService.switchOrganization(currentUser.userId(), request.organizationId)
+		authService.switchOrganization(currentUser.getUserId(), request.organizationId)
 
 }

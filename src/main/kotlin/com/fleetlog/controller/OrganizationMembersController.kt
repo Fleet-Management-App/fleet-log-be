@@ -13,13 +13,13 @@ class OrganizationMembersController(
 	private val organizationService: OrganizationService,
 ) : OrganizationMembersApi {
 
-	override fun listMembers() = organizationService.members()
+	override fun listMembers() = organizationService.getMembers()
 
 	override fun changeMemberRole(userId: UUID, request: ChangeRoleRequest) = organizationService.changeRole(userId, request)
 
 	override fun removeMember(userId: UUID) = organizationService.removeMember(userId)
 
-	override fun listInvitations() = organizationService.pendingInvitations()
+	override fun listInvitations() = organizationService.getPendingInvitations()
 
 	override fun createInvitation(request: CreateInvitationRequest) = organizationService.invite(request)
 

@@ -12,6 +12,6 @@ interface AccountApi {
 
 	@Operation(summary = "The caller, their organizations and the invitations waiting for them")
 	@GetMapping
-	fun me(): MeResponse
+	fun getMe(): MeResponse
 
 }
