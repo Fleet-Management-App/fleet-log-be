@@ -1,6 +1,6 @@
 package com.fleetlog.security
 
-import com.fleetlog.organization.MembershipRepository
+import com.fleetlog.repository.MembershipRepository
 import org.springframework.core.convert.converter.Converter
 import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.oauth2.jwt.Jwt

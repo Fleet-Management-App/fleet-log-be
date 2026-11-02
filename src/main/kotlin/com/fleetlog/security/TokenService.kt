@@ -1,7 +1,8 @@
 package com.fleetlog.security
 
-import com.fleetlog.account.AppUser
-import com.fleetlog.organization.Membership
+import com.fleetlog.dto.AuthTokenResponse
+import com.fleetlog.entity.AppUser
+import com.fleetlog.entity.Membership
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm
 import org.springframework.security.oauth2.jwt.JwsHeader
 import org.springframework.security.oauth2.jwt.JwtClaimsSet
@@ -9,11 +10,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import org.springframework.stereotype.Service
 import java.time.Instant
-
-data class AuthTokenResponse(
-	val accessToken: String,
-	val expiresAt: Instant,
-)
 
 /** Issues the API's JWTs. The active organization and the role in it travel as claims. */
 @Service
