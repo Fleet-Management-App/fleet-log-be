@@ -27,6 +27,7 @@
   - Follow the code style guidelines in the repository.
   - Follow the code quality guidelines in the repository.
   - Follow the naming conventions in the repository.
+  - Start every method name with a verb that says what it does (`getMembers`, `createInvitation`, `findMember`), never a bare noun (`members()`, `me()`). This includes controller / API interface methods, since their names become the operationIds the FE client is generated from. Two exceptions: Spring `@Bean` methods keep noun names (`passwordEncoder()`, `jwtDecoder()`), because the method name is the bean name; MapStruct conversions use `toX()` (`toMemberResponse()`).
   - Follow the documentation guidelines in the repository.
   - Follow the testing guidelines in the repository.
   - Follow the security guidelines in the repository.

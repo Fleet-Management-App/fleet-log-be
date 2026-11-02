@@ -13,13 +13,13 @@ import java.util.UUID
 @Component
 class CurrentUser {
 
-	fun principal(): FleetLogPrincipal =
+	fun getPrincipal(): FleetLogPrincipal =
 		(SecurityContextHolder.getContext().authentication as? FleetLogAuthentication)?.principal
 			?: throw AuthenticationCredentialsNotFoundException("Not authenticated")
 
-	fun userId(): UUID = principal().userId
+	fun getUserId(): UUID = getPrincipal().userId
 
 	/** The active organization; 403 when the caller has none. */
-	fun tenantId(): UUID = principal().tenantId ?: throw AccessDeniedException("No active organization")
+	fun getTenantId(): UUID = getPrincipal().tenantId ?: throw AccessDeniedException("No active organization")
 
 }
