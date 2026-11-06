@@ -3,6 +3,8 @@ package com.fleetlog
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.restassured.RestAssured
+import io.restassured.builder.RequestSpecBuilder
+import io.restassured.http.ContentType
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -17,6 +19,9 @@ abstract class BaseFleetLogBeIntegrationTest(body: BaseFleetLogBeIntegrationTest
 
 	init {
 		extension(SpringExtension())
+		// Every spec's requests default to JSON, so a test can just call `body(someObject)`
+		// without a per-call contentType/wrapper: RestAssured doesn't infer it on its own.
+		RestAssured.requestSpecification = RequestSpecBuilder().setContentType(ContentType.JSON).build()
 		beforeTest { RestAssured.port = port }
 		body()
 	}
