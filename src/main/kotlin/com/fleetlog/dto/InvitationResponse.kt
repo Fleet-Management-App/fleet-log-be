@@ -8,7 +8,7 @@ import java.util.UUID
 data class InvitationResponse(
 	val id: UUID,
 	val email: String,
-	val role: Role,
+	val roles: Set<Role>,
 	val invitedByName: String,
 	val createdAt: Instant,
 )

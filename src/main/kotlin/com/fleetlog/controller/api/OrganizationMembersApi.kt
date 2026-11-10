@@ -1,6 +1,6 @@
 package com.fleetlog.controller.api
 
-import com.fleetlog.dto.ChangeRoleRequest
+import com.fleetlog.dto.ChangeRolesRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.dto.InvitationResponse
 import com.fleetlog.dto.MemberResponse
@@ -14,9 +14,9 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -30,10 +30,10 @@ interface OrganizationMembersApi {
 	@GetMapping("/members")
 	fun listMembers(): List<MemberResponse>
 
-	@Operation(summary = "Change a member's role")
+	@Operation(summary = "Replace a member's roles", description = "A member can hold several roles, e.g. a Fleet Manager who also drives.")
 	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
-	@PatchMapping("/members/{userId}")
-	fun changeMemberRole(@PathVariable userId: UUID, @Valid @RequestBody request: ChangeRoleRequest): MemberResponse
+	@PutMapping("/members/{userId}/roles")
+	fun changeMemberRoles(@PathVariable userId: UUID, @Valid @RequestBody request: ChangeRolesRequest): MemberResponse
 
 	@Operation(summary = "Remove a member from the organization (their account stays)")
 	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(schema = Schema(implementation = ProblemDetail::class))])

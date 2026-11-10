@@ -1,7 +1,7 @@
 package com.fleetlog.controller
 
 import com.fleetlog.controller.api.OrganizationMembersApi
-import com.fleetlog.dto.ChangeRoleRequest
+import com.fleetlog.dto.ChangeRolesRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.service.OrganizationService
 import org.springframework.web.bind.annotation.RestController
@@ -15,7 +15,7 @@ class OrganizationMembersController(
 
 	override fun listMembers() = organizationService.getMembers()
 
-	override fun changeMemberRole(userId: UUID, request: ChangeRoleRequest) = organizationService.changeRole(userId, request)
+	override fun changeMemberRoles(userId: UUID, request: ChangeRolesRequest) = organizationService.changeRoles(userId, request)
 
 	override fun removeMember(userId: UUID) = organizationService.removeMember(userId)
 

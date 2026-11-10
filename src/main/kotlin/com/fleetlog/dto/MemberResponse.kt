@@ -9,6 +9,6 @@ data class MemberResponse(
 	val userId: UUID,
 	val fullName: String,
 	val email: String,
-	val role: Role,
+	val roles: Set<Role>,
 	val joinedAt: Instant,
 )

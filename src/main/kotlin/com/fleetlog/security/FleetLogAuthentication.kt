@@ -7,7 +7,7 @@ import org.springframework.security.oauth2.jwt.Jwt
 class FleetLogAuthentication(
 	private val principal: FleetLogPrincipal,
 	private val jwt: Jwt,
-) : AbstractAuthenticationToken(listOfNotNull(principal.role?.let { SimpleGrantedAuthority("ROLE_${it.name}") })) {
+) : AbstractAuthenticationToken(principal.roles.map { SimpleGrantedAuthority("ROLE_${it.name}") }) {
 
 	init {
 		isAuthenticated = true

@@ -8,17 +8,17 @@ import java.util.UUID
 
 interface InvitationRepository : JpaRepository<Invitation, UUID> {
 
-	@EntityGraph(attributePaths = ["organization", "invitedBy"])
+	@EntityGraph(attributePaths = ["organization", "invitedBy", "roles"])
 	fun findAllByEmailAndStatusOrderByCreatedAt(email: String, status: InvitationStatus): List<Invitation>
 
-	@EntityGraph(attributePaths = ["invitedBy"])
+	@EntityGraph(attributePaths = ["invitedBy", "roles"])
 	fun findAllByOrganizationIdAndStatusOrderByCreatedAt(organizationId: UUID, status: InvitationStatus): List<Invitation>
 
 	fun existsByOrganizationIdAndEmailAndStatus(organizationId: UUID, email: String, status: InvitationStatus): Boolean
 
 	fun findByIdAndOrganizationId(id: UUID, organizationId: UUID): Invitation?
 
-	@EntityGraph(attributePaths = ["organization"])
+	@EntityGraph(attributePaths = ["organization", "roles"])
 	fun findWithOrganizationById(id: UUID): Invitation?
 
 }

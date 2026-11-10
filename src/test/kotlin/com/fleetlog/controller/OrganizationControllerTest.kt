@@ -5,6 +5,7 @@ import com.fleetlog.TestApi
 import com.fleetlog.TestApi.withBearer
 import com.fleetlog.TestApi.withJson
 import com.fleetlog.TestApi.generateUniqueEmail
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.restassured.module.kotlin.extensions.Given
@@ -21,7 +22,7 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			@Suppress("UNCHECKED_CAST")
 			val active = TestApi.getMe(token)["activeOrganization"] as Map<String, Any?>
 			active["organizationName"] shouldBe "Demo Fleet"
-			active["role"] shouldBe "FLEET_MANAGER"
+			active["roles"] shouldBe listOf("FLEET_MANAGER")
 		}
 	}
 
@@ -41,6 +42,13 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 
 			Given { withBearer(accountant) } When { get("/api/organization/members") } Then { statusCode(403) }
 		}
+
+		it("let in a member who is a Driver and a Fleet Manager at once") {
+			val driverAndFleetManager = TestApi.createMemberOf(TestApi.createFleetManagerOfNewOrganization(), "DRIVER", "FLEET_MANAGER")
+
+			TestApi.getActiveRoles(driverAndFleetManager) shouldContainExactly listOf("DRIVER", "FLEET_MANAGER")
+			Given { withBearer(driverAndFleetManager) } When { get("/api/organization/members") } Then { statusCode(200) }
+		}
 	}
 
 	describe("invitations") {
@@ -53,20 +61,27 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			(TestApi.getMe(newcomer)["pendingInvitations"] as List<*>).shouldHaveSize(1)
 
 			val joined = TestApi.accept(newcomer, invitationId)
-			@Suppress("UNCHECKED_CAST")
-			(TestApi.getMe(joined)["activeOrganization"] as Map<String, Any?>)["role"] shouldBe "DRIVER"
+			TestApi.getActiveRoles(joined) shouldBe listOf("DRIVER")
 			Given { withBearer(fleetManager) } When { get("/api/organization/members") } Then { body("", hasSize<Any>(2)) }
 		}
 
 		it("refuses to invite someone who is already a member") {
 			val fleetManager = TestApi.createFleetManagerOfNewOrganization()
 			val email = generateUniqueEmail()
-			TestApi.createMemberOf(fleetManager, "DRIVER", email)
+			TestApi.createMemberOf(fleetManager, "DRIVER", email = email)
 
-			Given { withBearer(fleetManager).withJson(mapOf("email" to email, "role" to "ACCOUNTANT")) } When {
+			Given { withBearer(fleetManager).withJson(mapOf("email" to email, "roles" to listOf("ACCOUNTANT"))) } When {
 				post("/api/organization/invitations")
 			} Then {
 				statusCode(409)
+			}
+		}
+
+		it("refuses an invitation without a role") {
+			Given { withBearer(TestApi.createFleetManagerOfNewOrganization()).withJson(mapOf("email" to generateUniqueEmail(), "roles" to emptyList<String>())) } When {
+				post("/api/organization/invitations")
+			} Then {
+				statusCode(400)
 			}
 		}
 
@@ -91,11 +106,7 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			val otherFleetManager = TestApi.createFleetManagerOfNewOrganization()
 			val otherDriverId = TestApi.getUserId(TestApi.createMemberOf(otherFleetManager, "DRIVER"))
 
-			Given { withBearer(TestApi.createFleetManagerOfNewOrganization()).withJson(mapOf("role" to "FLEET_MANAGER")) } When {
-				patch("/api/organization/members/$otherDriverId")
-			} Then {
-				statusCode(404)
-			}
+			TestApi.changeRoles(TestApi.createFleetManagerOfNewOrganization(), otherDriverId, "FLEET_MANAGER") Then { statusCode(404) }
 		}
 
 		it("doesn't let a Fleet Manager revoke another organization's invitation") {
@@ -123,23 +134,34 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			val driver = TestApi.createMemberOf(fleetManager, "DRIVER")
 			Given { withBearer(driver) } When { get("/api/organization/members") } Then { statusCode(403) }
 
-			Given { withBearer(fleetManager).withJson(mapOf("role" to "FLEET_MANAGER")) } When {
-				patch("/api/organization/members/${TestApi.getUserId(driver)}")
-			} Then {
+			TestApi.changeRoles(fleetManager, TestApi.getUserId(driver), "DRIVER", "FLEET_MANAGER") Then {
 				statusCode(200)
+				body("roles", hasSize<Any>(2))
 			}
 
 			Given { withBearer(driver) } When { get("/api/organization/members") } Then { statusCode(200) }
+			TestApi.getActiveRoles(driver) shouldContainExactly listOf("DRIVER", "FLEET_MANAGER")
 		}
 
-		it("refuses to demote the last Fleet Manager") {
+		it("refuses to take Fleet Manager away from the last one, even if they keep another role") {
 			val fleetManager = TestApi.createFleetManagerOfNewOrganization()
 
-			Given { withBearer(fleetManager).withJson(mapOf("role" to "DRIVER")) } When {
-				patch("/api/organization/members/${TestApi.getUserId(fleetManager)}")
-			} Then {
-				statusCode(409)
-			}
+			TestApi.changeRoles(fleetManager, TestApi.getUserId(fleetManager), "DRIVER") Then { statusCode(409) }
+		}
+
+		it("lets a Fleet Manager step down to Driver once someone else is a Fleet Manager") {
+			val fleetManager = TestApi.createFleetManagerOfNewOrganization()
+			TestApi.createMemberOf(fleetManager, "FLEET_MANAGER")
+
+			TestApi.changeRoles(fleetManager, TestApi.getUserId(fleetManager), "DRIVER") Then { statusCode(200) }
+			TestApi.getActiveRoles(fleetManager) shouldBe listOf("DRIVER")
+		}
+
+		it("refuses an empty set of roles") {
+			val fleetManager = TestApi.createFleetManagerOfNewOrganization()
+			val driverId = TestApi.getUserId(TestApi.createMemberOf(fleetManager, "DRIVER"))
+
+			TestApi.changeRoles(fleetManager, driverId) Then { statusCode(400) }
 		}
 
 		it("removes a member's access but keeps their account") {

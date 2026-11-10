@@ -45,8 +45,8 @@ object TestApi {
 			statusCode(201)
 		} Extract { path("accessToken") }
 
-	fun invite(fleetManagerToken: String, email: String, role: String): String =
-		Given { withBearer(fleetManagerToken).withJson(mapOf("email" to email, "role" to role)) } When {
+	fun invite(fleetManagerToken: String, email: String, vararg roles: String): String =
+		Given { withBearer(fleetManagerToken).withJson(mapOf("email" to email, "roles" to roles.toList())) } When {
 			post("/api/organization/invitations")
 		} Then {
 			statusCode(201)
@@ -59,9 +59,9 @@ object TestApi {
 			statusCode(200)
 		} Extract { path("accessToken") }
 
-	/** A new account that joined the Fleet Manager's organization with [role]; returns its token. */
-	fun createMemberOf(fleetManagerToken: String, role: String, email: String = generateUniqueEmail(role.lowercase())): String {
-		val invitationId = invite(fleetManagerToken, email, role)
+	/** A new account that joined the Fleet Manager's organization with [roles]; returns its token. */
+	fun createMemberOf(fleetManagerToken: String, vararg roles: String, email: String = generateUniqueEmail(roles.first().lowercase())): String {
+		val invitationId = invite(fleetManagerToken, email, *roles)
 		return accept(signUp(email), invitationId)
 	}
 
@@ -77,5 +77,15 @@ object TestApi {
 	fun getActiveOrganizationId(token: String): String =
 		@Suppress("UNCHECKED_CAST")
 		(getMe(token)["activeOrganization"] as Map<String, Any?>)["organizationId"] as String
+
+	/** The caller's roles in the active organization, as /api/me reports them. */
+	fun getActiveRoles(token: String): List<String> =
+		@Suppress("UNCHECKED_CAST")
+		((getMe(token)["activeOrganization"] as Map<String, Any?>)["roles"] as List<String>)
+
+	fun changeRoles(fleetManagerToken: String, userId: String, vararg roles: String) =
+		Given { withBearer(fleetManagerToken).withJson(mapOf("roles" to roles.toList())) } When {
+			put("/api/organization/members/$userId/roles")
+		}
 
 }

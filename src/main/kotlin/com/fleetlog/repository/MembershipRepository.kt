@@ -9,20 +9,22 @@ import java.util.UUID
 
 interface MembershipRepository : JpaRepository<Membership, UUID> {
 
-	@EntityGraph(attributePaths = ["organization"])
+	@EntityGraph(attributePaths = ["organization", "roles"])
 	fun findAllByUserIdOrderByCreatedAt(userId: UUID): List<Membership>
 
-	@EntityGraph(attributePaths = ["organization", "user"])
+	@EntityGraph(attributePaths = ["organization", "user", "roles"])
 	fun findByUserIdAndOrganizationId(userId: UUID, organizationId: UUID): Membership?
 
-	@EntityGraph(attributePaths = ["user"])
+	@EntityGraph(attributePaths = ["user", "roles"])
 	fun findAllByOrganizationIdOrderByCreatedAt(organizationId: UUID): List<Membership>
 
 	fun existsByUserIdAndOrganizationId(userId: UUID, organizationId: UUID): Boolean
 
+	@Query("select count(m) from Membership m where m.organization.id = :organizationId and :role member of m.roles")
 	fun countByOrganizationIdAndRole(organizationId: UUID, role: Role): Long
 
-	@Query("select m.role from Membership m where m.user.id = :userId and m.organization.id = :organizationId")
-	fun findRole(userId: UUID, organizationId: UUID): Role?
+	/** The user's roles in the organization; empty when they are not a member. */
+	@Query("select r from Membership m join m.roles r where m.user.id = :userId and m.organization.id = :organizationId")
+	fun findRoles(userId: UUID, organizationId: UUID): List<Role>
 
 }
