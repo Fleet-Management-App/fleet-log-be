@@ -14,6 +14,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 class ApiExceptionHandler : ResponseEntityExceptionHandler() {
 
+	@ExceptionHandler(BadRequestException::class)
+	fun handleBadRequest(e: BadRequestException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.message)
+
 	@ExceptionHandler(NotFoundException::class)
 	fun handleNotFound(e: NotFoundException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.message)
 
