@@ -11,6 +11,9 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  liquibase:
+    # Liquibase 5 sends anonymous usage data by default; FleetLog doesn't report anything
+    analytics-enabled: false
 
 fleetlog:
   security:
