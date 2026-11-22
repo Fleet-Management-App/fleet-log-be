@@ -8,13 +8,17 @@ import com.fleetlog.fixtures.Accounts
 import com.fleetlog.fixtures.Vehicles
 import com.fleetlog.fixtures.asRole
 import com.fleetlog.fixtures.withBearer
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.equalTo
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
+import java.util.UUID
 
 /** Deliberately missing every field but `plate`, to exercise the 400 path — `VehicleCreateRequest` has none optional. */
 private data class IncompleteVehicleCreateRequest(val plate: String)
@@ -62,13 +66,40 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 		}
 
-		it("returns 400 for a missing field") {
+		it("returns 400 for a missing field, naming it") {
 			Given {
 				asRole(Role.FLEET_MANAGER).body(IncompleteVehicleCreateRequest(Vehicles.uniquePlate()))
 			} When {
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
+				body("field", equalTo("vin"))
+			}
+		}
+
+		it("returns 400 VALIDATION_FAILED naming each failed field and its constraint") {
+			Given {
+				asRole(Role.FLEET_MANAGER).body(Vehicles.vehicleRequest(plate = " ", vin = "X".repeat(33)))
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("VALIDATION_FAILED"))
+				body("errors.size()", equalTo(2))
+				body("errors.find { it.field == 'plate' }.code", equalTo("NotBlank"))
+				body("errors.find { it.field == 'vin' }.code", equalTo("Size"))
+			}
+		}
+
+		it("returns 400 MALFORMED_REQUEST for a body that isn't JSON") {
+			Given {
+				asRole(Role.FLEET_MANAGER).body("{not json")
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
 			}
 		}
 
@@ -83,6 +114,8 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_PLATE_TAKEN"))
+				body("field", equalTo("plate"))
 			}
 		}
 
@@ -97,6 +130,8 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_VIN_TAKEN"))
+				body("field", equalTo("vin"))
 			}
 		}
 
@@ -110,6 +145,66 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.CREATED.value())
+			}
+		}
+
+		it("stores the plate trimmed, upper-case with single inner spaces, and the VIN upper-case without whitespace") {
+			val vehicle = Given {
+				asRole(Role.FLEET_MANAGER).body(Vehicles.vehicleRequest(plate = "  1ab \t 2345 ", vin = " tmb jj7ne 9a1234567 "))
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.CREATED.value())
+			} Extract {
+				`as`(VehicleResponse::class.java)
+			}
+			vehicle.plate shouldBe "1AB 2345"
+			vehicle.vin shouldBe "TMBJJ7NE9A1234567"
+		}
+
+		it("returns 409 for a plate that differs only in spacing and case") {
+			val fleetManager = Accounts.createOrganization()
+			Vehicles.createVehicle(fleetManager, plate = "1AB 2345")
+
+			Given {
+				withBearer(fleetManager).body(Vehicles.vehicleRequest(plate = "1ab2345"))
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_PLATE_TAKEN"))
+				body("field", equalTo("plate"))
+			}
+		}
+
+		it("returns 409 for a VIN that differs only in spacing and case") {
+			val fleetManager = Accounts.createOrganization()
+			Vehicles.createVehicle(fleetManager, vin = "TMBJJ7NE9A1234567")
+
+			Given {
+				withBearer(fleetManager).body(Vehicles.vehicleRequest(vin = "tmb jj7ne 9a1234567"))
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_VIN_TAKEN"))
+				body("field", equalTo("vin"))
+			}
+		}
+
+		it("is backed by a unique index that ignores spaces and case in the plate, not only by the service check") {
+			val fleetManager = Accounts.createOrganization()
+			Vehicles.createVehicle(fleetManager, plate = "1AB 2345")
+			val organizationId = UUID.fromString(Accounts.getActiveOrganizationId(fleetManager))
+
+			shouldThrow<DuplicateKeyException> {
+				jdbc.update(
+					"""
+					INSERT INTO vehicle (id, organization_id, plate, vin, make, model, fuel_type, odometer_km, status, created_at)
+					VALUES (?, ?, '1ab2345', ?, 'Skoda', 'Octavia', 'DIESEL', 0, 'ACTIVE', now())
+					""".trimIndent(),
+					UUID.randomUUID(), organizationId, Vehicles.uniqueVin(),
+				)
 			}
 		}
 	}

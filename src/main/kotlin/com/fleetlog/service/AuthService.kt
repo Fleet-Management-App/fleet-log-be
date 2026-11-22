@@ -5,6 +5,7 @@ import com.fleetlog.dto.LoginRequest
 import com.fleetlog.dto.SignUpRequest
 import com.fleetlog.entity.AppUser
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.repository.AppUserRepository
 import com.fleetlog.repository.MembershipRepository
 import com.fleetlog.security.TokenService
@@ -28,7 +29,7 @@ class AuthService(
 	/** Creates a global account. It has no organization yet, so the token carries no tenant. */
 	fun signUp(request: SignUpRequest): AuthTokenResponse {
 		val email = normalizeEmail(request.email)
-		if (userRepository.existsByEmail(email)) throw ConflictException("An account with this e-mail already exists")
+		if (userRepository.existsByEmail(email)) throw ConflictException("An account with this e-mail already exists", ErrorCode.EMAIL_TAKEN, "email")
 		val user = userRepository.save(
 			AppUser(
 				email = email,

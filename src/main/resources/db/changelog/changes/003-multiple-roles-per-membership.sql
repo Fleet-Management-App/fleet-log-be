@@ -1,3 +1,6 @@
+--liquibase formatted sql
+
+--changeset fleetlog:003-multiple-roles-per-membership
 -- A person can hold several roles in the same organization (e.g. a Fleet Manager who also drives),
 -- so roles move from a single column into their own tables, one row per role.
 

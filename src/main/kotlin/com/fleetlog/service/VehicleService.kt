@@ -5,10 +5,13 @@ import com.fleetlog.dto.VehicleResponse
 import com.fleetlog.entity.Role
 import com.fleetlog.entity.Vehicle
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.mapper.VehicleMapper
 import com.fleetlog.repository.OrganizationRepository
 import com.fleetlog.repository.VehicleRepository
 import com.fleetlog.security.CurrentUser
+import com.fleetlog.util.normalizePlate
+import com.fleetlog.util.normalizeVin
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,17 +29,19 @@ class VehicleService(
 	fun create(request: VehicleCreateRequest): VehicleResponse {
 		val tenantId = currentUser.getTenantId()
 		if (!currentUser.getPrincipal().hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Fleet Manager role required")
-		if (vehicleRepository.existsByOrganizationIdAndPlate(tenantId, request.plate)) {
-			throw ConflictException("A vehicle with this plate already exists")
+		val plate = normalizePlate(request.plate)
+		val vin = normalizeVin(request.vin)
+		if (vehicleRepository.existsByOrganizationIdAndPlateIgnoringSpaces(tenantId, plate)) {
+			throw ConflictException("A vehicle with this plate already exists", ErrorCode.VEHICLE_PLATE_TAKEN, "plate")
 		}
-		if (vehicleRepository.existsByOrganizationIdAndVin(tenantId, request.vin)) {
-			throw ConflictException("A vehicle with this VIN already exists")
+		if (vehicleRepository.existsByOrganizationIdAndVin(tenantId, vin)) {
+			throw ConflictException("A vehicle with this VIN already exists", ErrorCode.VEHICLE_VIN_TAKEN, "vin")
 		}
 		val vehicle = vehicleRepository.save(
 			Vehicle(
 				organization = organizationRepository.getReferenceById(tenantId),
-				plate = request.plate,
-				vin = request.vin,
+				plate = plate,
+				vin = vin,
 				make = request.make,
 				model = request.model,
 				fuelType = request.fuelType,

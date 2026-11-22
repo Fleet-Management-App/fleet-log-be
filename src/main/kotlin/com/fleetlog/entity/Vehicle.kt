@@ -13,7 +13,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
-/** A fleet vehicle, scoped to one organization (SPEC-01). Plate and VIN are unique per tenant. */
+/**
+ * A fleet vehicle, scoped to one organization (SPEC-01). Plate and VIN are stored normalised (see
+ * normalizePlate/normalizeVin) and unique per tenant; plates ignoring spaces.
+ */
 @Entity
 @Table(name = "vehicle")
 class Vehicle(

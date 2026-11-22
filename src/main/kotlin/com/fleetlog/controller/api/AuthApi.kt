@@ -4,6 +4,7 @@ import com.fleetlog.dto.AuthTokenResponse
 import com.fleetlog.dto.LoginRequest
 import com.fleetlog.dto.SignUpRequest
 import com.fleetlog.dto.SwitchOrganizationRequest
+import com.fleetlog.exception.ApiProblem
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -24,7 +25,7 @@ interface AuthApi {
 
 	@Operation(summary = "Create a global account (no organization yet)")
 	@ApiResponse(responseCode = "201", description = "Account created, token without a tenant")
-	@ApiResponse(responseCode = "409", description = "E-mail already used", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
+	@ApiResponse(responseCode = "409", description = "E-mail already used", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))])
 	@SecurityRequirements
 	@PostMapping("/sign-up")
 	@ResponseStatus(HttpStatus.CREATED)
@@ -32,7 +33,7 @@ interface AuthApi {
 
 	@Operation(summary = "Log in; the first organization the user joined becomes active")
 	@ApiResponse(responseCode = "200", description = "Token issued")
-	@ApiResponse(responseCode = "401", description = "Wrong e-mail or password", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
+	@ApiResponse(responseCode = "401", description = "Wrong e-mail or password", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))])
 	@SecurityRequirements
 	@PostMapping("/login")
 	fun login(@Valid @RequestBody request: LoginRequest): AuthTokenResponse

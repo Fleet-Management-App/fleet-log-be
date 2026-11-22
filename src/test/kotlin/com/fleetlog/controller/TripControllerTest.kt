@@ -2,7 +2,6 @@ package com.fleetlog.controller
 
 import com.fleetlog.BaseFleetLogBeIntegrationTest
 import com.fleetlog.dto.TripFuelDecisionRequest
-import com.fleetlog.dto.TripFuelRequest
 import com.fleetlog.dto.TripOdometerRequest
 import com.fleetlog.dto.TripPlanDecisionRequest
 import com.fleetlog.dto.TripResponse
@@ -14,6 +13,7 @@ import com.fleetlog.fixtures.Trips
 import com.fleetlog.fixtures.Vehicles
 import com.fleetlog.fixtures.asRole
 import com.fleetlog.fixtures.withBearer
+import com.fleetlog.service.TripService
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -22,8 +22,13 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.contains
+import org.hamcrest.Matchers.containsString
+import org.hamcrest.Matchers.equalTo
+import org.hamcrest.Matchers.not
 import org.springframework.http.HttpStatus
-import java.math.BigDecimal
+import java.util.Base64
+import java.util.UUID
 
 class TripControllerTest : BaseFleetLogBeIntegrationTest({
 
@@ -31,6 +36,16 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 		it("starts a trip in PLANNED status") {
 			val fleetManager = Accounts.createOrganization()
 			Trips.createTrip(fleetManager, Vehicles.createVehicleId(fleetManager)).status shouldBe TripStatus.PLANNED
+		}
+
+		it("names the driver, so the Fleet Manager's approval queue can show who planned it") {
+			val fleetManager = Accounts.createOrganization()
+			val vehicleId = Vehicles.createVehicleId(fleetManager)
+			val driver = Accounts.memberOf(fleetManager, Role.DRIVER)
+
+			val trip = Trips.createTrip(driver, vehicleId)
+			trip.driverId.toString() shouldBe Accounts.getUserId(driver)
+			trip.driverName shouldBe Accounts.getMe(driver).fullName
 		}
 
 		it("returns 400 when the vehicle's STK has already expired (BR-01)") {
@@ -43,6 +58,8 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/trips")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("VEHICLE_UNAVAILABLE"))
+				body("field", equalTo("vehicleId"))
 			}
 		}
 
@@ -55,6 +72,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/trips")
 			} Then {
 				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("VEHICLE_NOT_FOUND"))
 			}
 		}
 
@@ -109,6 +127,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/plan-approval")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLANNED"))
 			}
 		}
 
@@ -127,6 +146,72 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 			trip.status shouldBe TripStatus.PLAN_REJECTED
 			trip.rejectionReason shouldBe "Vehicle double-booked"
+		}
+
+		it("returns 400 for rejecting without a reason, leaving the plan PLANNED") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+
+			for (reason in listOf(null, "")) {
+				Given {
+					withBearer(fleetManager).body(TripPlanDecisionRequest(approved = false, rejectionReason = reason))
+				} When {
+					patch("/api/trips/$tripId/plan-approval")
+				} Then {
+					statusCode(HttpStatus.BAD_REQUEST.value())
+					body("code", equalTo("REJECTION_REASON_REQUIRED"))
+					body("field", equalTo("rejectionReason"))
+				}
+			}
+
+			Trips.approvePlan(fleetManager, tripId).status shouldBe TripStatus.PLAN_APPROVED
+		}
+
+		it("clears any reason sent along with an approval") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+
+			val trip = Given {
+				withBearer(fleetManager).body(TripPlanDecisionRequest(approved = true, rejectionReason = "ignored"))
+			} When {
+				patch("/api/trips/$tripId/plan-approval")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			} Extract {
+				`as`(TripResponse::class.java)
+			}
+			trip.rejectionReason.shouldBeNull()
+		}
+
+		it("returns 400 for approving a plan whose vehicle was suspended, or its STK ran out, after planning (BR-01)") {
+			val fleetManager = Accounts.createOrganization()
+			val suspendedVehicleId = Vehicles.createVehicleId(fleetManager)
+			val stkExpiredVehicleId = Vehicles.createVehicleId(fleetManager)
+			val suspendedTripId = Trips.createTripId(fleetManager, suspendedVehicleId)
+			val stkExpiredTripId = Trips.createTripId(fleetManager, stkExpiredVehicleId)
+			// No API changes a vehicle's status or STK yet
+			jdbc.update("UPDATE vehicle SET status = 'SUSPENDED' WHERE id = ?", UUID.fromString(suspendedVehicleId))
+			jdbc.update("UPDATE vehicle SET stk_due_date = DATE '2000-01-01' WHERE id = ?", UUID.fromString(stkExpiredVehicleId))
+
+			for (tripId in listOf(suspendedTripId, stkExpiredTripId)) {
+				Given {
+					withBearer(fleetManager).body(TripPlanDecisionRequest(approved = true))
+				} When {
+					patch("/api/trips/$tripId/plan-approval")
+				} Then {
+					statusCode(HttpStatus.BAD_REQUEST.value())
+					body("code", equalTo("VEHICLE_UNAVAILABLE"))
+				}
+			}
+
+			// Rejecting it is still possible, so the driver can pick another vehicle (BR-07)
+			Given {
+				withBearer(fleetManager).body(TripPlanDecisionRequest(approved = false, rejectionReason = "Vehicle is suspended"))
+			} When {
+				patch("/api/trips/$suspendedTripId/plan-approval")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			}
 		}
 	}
 
@@ -181,6 +266,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/plan")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_REJECTED"))
 			}
 		}
 	}
@@ -196,6 +282,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/odometer")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_APPROVED"))
 			}
 		}
 
@@ -216,6 +303,8 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/odometer")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("ODOMETER_END_BEFORE_START"))
+				body("field", equalTo("odometerEndKm"))
 			}
 		}
 
@@ -242,25 +331,30 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			trip.status shouldBe TripStatus.COMPLETED
 			trip.fuel.shouldBeNull()
 		}
+
+		it("moves the vehicle's odometer forward to the trip's end reading, never back") {
+			val fleetManager = Accounts.createOrganization()
+			val vehicle = Vehicles.createVehicle(fleetManager)
+			val vehicleId = vehicle.id.toString()
+			val laterTripId = Trips.createTripId(fleetManager, vehicleId)
+			val earlierTripId = Trips.createTripId(fleetManager, vehicleId)
+			Trips.approvePlan(fleetManager, laterTripId)
+			Trips.approvePlan(fleetManager, earlierTripId)
+
+			Trips.logOdometer(fleetManager, laterTripId, startKm = vehicle.odometerKm, endKm = vehicle.odometerKm + 150)
+			Vehicles.getVehicle(fleetManager, vehicleId).odometerKm shouldBe vehicle.odometerKm + 150
+
+			// Logged late, out of order: its lower reading must not wind the vehicle back
+			Trips.logOdometer(fleetManager, earlierTripId, startKm = vehicle.odometerKm - 100, endKm = vehicle.odometerKm)
+			Vehicles.getVehicle(fleetManager, vehicleId).odometerKm shouldBe vehicle.odometerKm + 150
+		}
 	}
 
 	describe("fuel logging and approval") {
 		fun approvedAndCompletedTrip(fleetManager: String): String {
 			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
-			Given {
-				withBearer(fleetManager).body(TripPlanDecisionRequest(approved = true))
-			} When {
-				patch("/api/trips/$tripId/plan-approval")
-			} Then {
-				statusCode(HttpStatus.OK.value())
-			}
-			Given {
-				withBearer(fleetManager).body(TripOdometerRequest(odometerStartKm = 0, odometerEndKm = 50))
-			} When {
-				patch("/api/trips/$tripId/odometer")
-			} Then {
-				statusCode(HttpStatus.OK.value())
-			}
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logOdometer(fleetManager, tripId, startKm = 0, endKm = 50)
 			return tripId
 		}
 
@@ -268,36 +362,196 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			val fleetManager = Accounts.createOrganization()
 			val tripId = approvedAndCompletedTrip(fleetManager)
 
-			val trip = Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("40.5"), price = BigDecimal("55.2"), receiptPhoto = "base64data"))
+			val trip = Trips.logFuel(fleetManager, tripId)
+			trip.status shouldBe TripStatus.COMPLETED
+			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+			trip.fuel.shouldNotBeNull().hasReceipt shouldBe true
+		}
+
+		it("logs fuel on a plan-approved trip whose odometer isn't logged yet") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+
+			val trip = Trips.logFuel(fleetManager, tripId)
+			trip.status shouldBe TripStatus.PLAN_APPROVED
+			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+		}
+
+		it("returns 409 for fuel on a trip whose plan isn't approved (BR-03)") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+
+			Given {
+				withBearer(fleetManager).body(Trips.fuelBody())
 			} When {
 				post("/api/trips/$tripId/fuel")
 			} Then {
-				statusCode(HttpStatus.OK.value())
-			} Extract {
-				`as`(TripResponse::class.java)
+				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_APPROVED"))
 			}
-			trip.status shouldBe TripStatus.COMPLETED
-			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+		}
+
+		it("returns 409 for fuel on a cancelled trip") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Given {
+				withBearer(fleetManager)
+			} When {
+				patch("/api/trips/$tripId/cancel")
+			} Then {
+				statusCode(HttpStatus.NO_CONTENT.value())
+			}
+
+			Given {
+				withBearer(fleetManager).body(Trips.fuelBody())
+			} When {
+				post("/api/trips/$tripId/fuel")
+			} Then {
+				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_APPROVED"))
+			}
+		}
+
+		it("returns 400 VALIDATION_FAILED for a blank receipt (BR-14)") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+
+			Given {
+				withBearer(fleetManager).body(Trips.fuelBody(receiptPhoto = " "))
+			} When {
+				post("/api/trips/$tripId/fuel")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("VALIDATION_FAILED"))
+				body("errors.field", contains("receiptPhoto"))
+				body("errors.code", contains("NotBlank"))
+			}
+		}
+
+		it("returns 400 naming receiptPhoto when there is no receipt at all (BR-14)") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+
+			Given {
+				withBearer(fleetManager).body("""{"liters": 40.5, "price": 55.2}""")
+			} When {
+				post("/api/trips/$tripId/fuel")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
+				body("field", equalTo("receiptPhoto"))
+			}
+		}
+
+		it("returns 400 RECEIPT_PHOTO_INVALID for a receipt that isn't a base64 image data URL, logging nothing") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+			val invalidReceipts = listOf(
+				"data:application/pdf;base64,JVBERi0xLjQ=", // not an image
+				"data:image/gif;base64,R0lGODlhAQABAAAAACw=", // an image, but not an accepted type
+				"data:image/png;base64,not*base64!", // bad base64
+				"data:image/png;base64,", // nothing in it
+				"data:image/png,iVBORw0KGgo=", // not base64-encoded
+				"data:image/png;charset=utf-8;base64,iVBORw0KGgo=", // parameters aren't accepted
+				"iVBORw0KGgo=", // base64 without the data URL around it
+			)
+
+			for (receiptPhoto in invalidReceipts) {
+				Given {
+					withBearer(fleetManager).body(Trips.fuelBody(receiptPhoto = receiptPhoto))
+				} When {
+					post("/api/trips/$tripId/fuel")
+				} Then {
+					statusCode(HttpStatus.BAD_REQUEST.value())
+					body("code", equalTo("RECEIPT_PHOTO_INVALID"))
+					body("field", equalTo("receiptPhoto"))
+				}
+			}
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("fuel", equalTo(null))
+			}
+			jdbc.queryForObject("SELECT count(*) FROM fuel_receipt WHERE trip_id = ?", Int::class.java, UUID.fromString(tripId)) shouldBe 0
+		}
+
+		it("accepts a receipt of exactly 5 MiB and returns 400 RECEIPT_PHOTO_TOO_LARGE for one byte more") {
+			val fleetManager = Accounts.createOrganization()
+			val tooLargeTripId = approvedAndCompletedTrip(fleetManager)
+			val maxSizeTripId = approvedAndCompletedTrip(fleetManager)
+			fun jpegOfSize(size: Int) = "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(ByteArray(size))
+
+			Given {
+				withBearer(fleetManager).body(Trips.fuelBody(receiptPhoto = jpegOfSize(TripService.MAX_RECEIPT_PHOTO_BYTES + 1)))
+			} When {
+				post("/api/trips/$tooLargeTripId/fuel")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("RECEIPT_PHOTO_TOO_LARGE"))
+				body("field", equalTo("receiptPhoto"))
+			}
+
+			Trips.logFuel(fleetManager, maxSizeTripId, Trips.fuelBody(receiptPhoto = jpegOfSize(TripService.MAX_RECEIPT_PHOTO_BYTES)))
+				.fuel.shouldNotBeNull().hasReceipt shouldBe true
+		}
+
+		it("accepts every allowed image type, matching the media type case-insensitively") {
+			val fleetManager = Accounts.createOrganization()
+
+			for (contentType in listOf("image/jpeg", "image/png", "image/webp", "image/heic", "IMAGE/HEIF")) {
+				val tripId = approvedAndCompletedTrip(fleetManager)
+				Trips.logFuel(fleetManager, tripId, Trips.fuelBody(receiptPhoto = "data:$contentType;BASE64,AAECAw=="))
+
+				Given {
+					withBearer(fleetManager)
+				} When {
+					get("/api/trips/$tripId/fuel/receipt")
+				} Then {
+					statusCode(HttpStatus.OK.value())
+					body("receiptPhoto", equalTo("data:${contentType.lowercase()};base64,AAECAw=="))
+				}
+			}
 		}
 
 		it("returns 409 for a second fuel entry while the first is pending") {
 			val fleetManager = Accounts.createOrganization()
 			val tripId = approvedAndCompletedTrip(fleetManager)
+			Trips.logFuel(fleetManager, tripId)
+
 			Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("40.5"), price = BigDecimal("55.2")))
+				withBearer(fleetManager).body(Trips.fuelBody(liters = "10.0", price = "20.0"))
 			} When {
 				post("/api/trips/$tripId/fuel")
+			} Then {
+				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("FUEL_ENTRY_ALREADY_EXISTS"))
+			}
+		}
+
+		it("returns 409 for overwriting an approved fuel entry") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+			Trips.logFuel(fleetManager, tripId)
+			Given {
+				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = true))
+			} When {
+				patch("/api/trips/$tripId/fuel-approval")
 			} Then {
 				statusCode(HttpStatus.OK.value())
 			}
 
 			Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("10.0"), price = BigDecimal("20.0")))
+				withBearer(fleetManager).body(Trips.fuelBody())
 			} When {
 				post("/api/trips/$tripId/fuel")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("FUEL_ENTRY_ALREADY_EXISTS"))
 			}
 		}
 
@@ -311,20 +565,95 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/fuel-approval")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("NO_FUEL_ENTRY"))
 			}
+		}
+
+		it("returns 409 for deciding a fuel entry that is already approved or rejected") {
+			val fleetManager = Accounts.createOrganization()
+			val approvedTripId = approvedAndCompletedTrip(fleetManager)
+			val rejectedTripId = approvedAndCompletedTrip(fleetManager)
+			Trips.logFuel(fleetManager, approvedTripId)
+			Trips.logFuel(fleetManager, rejectedTripId)
+			Given {
+				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = true))
+			} When {
+				patch("/api/trips/$approvedTripId/fuel-approval")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			}
+			Given {
+				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = false, rejectionReason = "Receipt unreadable"))
+			} When {
+				patch("/api/trips/$rejectedTripId/fuel-approval")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			}
+
+			for (tripId in listOf(approvedTripId, rejectedTripId)) {
+				Given {
+					withBearer(fleetManager).body(TripFuelDecisionRequest(approved = false, rejectionReason = "Changed my mind"))
+				} When {
+					patch("/api/trips/$tripId/fuel-approval")
+				} Then {
+					statusCode(HttpStatus.CONFLICT.value())
+					body("code", equalTo("FUEL_ENTRY_NOT_PENDING"))
+				}
+			}
+		}
+
+		it("returns 400 for rejecting a fuel entry without a reason, leaving it PENDING") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+			Trips.logFuel(fleetManager, tripId)
+
+			for (reason in listOf(null, "   ")) {
+				Given {
+					withBearer(fleetManager).body(TripFuelDecisionRequest(approved = false, rejectionReason = reason))
+				} When {
+					patch("/api/trips/$tripId/fuel-approval")
+				} Then {
+					statusCode(HttpStatus.BAD_REQUEST.value())
+					body("code", equalTo("REJECTION_REASON_REQUIRED"))
+					body("field", equalTo("rejectionReason"))
+				}
+			}
+
+			val trip = Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			} Extract {
+				`as`(TripResponse::class.java)
+			}
+			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+		}
+
+		it("clears any reason sent along with an approval") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+			Trips.logFuel(fleetManager, tripId)
+
+			val trip = Given {
+				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = true, rejectionReason = "ignored"))
+			} When {
+				patch("/api/trips/$tripId/fuel-approval")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			} Extract {
+				`as`(TripResponse::class.java)
+			}
+			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.APPROVED
+			trip.fuel.shouldNotBeNull().rejectionReason.shouldBeNull()
 		}
 
 		it("returns 403 for a Driver deciding fuel approval") {
 			val fleetManager = Accounts.createOrganization()
 			val driver = Accounts.memberOf(fleetManager, Role.DRIVER)
 			val tripId = approvedAndCompletedTrip(fleetManager)
-			Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("40.5"), price = BigDecimal("55.2")))
-			} When {
-				post("/api/trips/$tripId/fuel")
-			} Then {
-				statusCode(HttpStatus.OK.value())
-			}
+			Trips.logFuel(fleetManager, tripId)
 
 			Given {
 				withBearer(driver).body(TripFuelDecisionRequest(approved = true))
@@ -338,32 +667,147 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 		it("lets the rejected fuel entry be resubmitted through the same endpoint (BR-07)") {
 			val fleetManager = Accounts.createOrganization()
 			val tripId = approvedAndCompletedTrip(fleetManager)
-			Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("40.5"), price = BigDecimal("55.2")))
-			} When {
-				post("/api/trips/$tripId/fuel")
-			} Then {
-				statusCode(HttpStatus.OK.value())
-			}
-			Given {
+			Trips.logFuel(fleetManager, tripId)
+			val rejected = Given {
 				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = false, rejectionReason = "Price too high"))
 			} When {
 				patch("/api/trips/$tripId/fuel-approval")
 			} Then {
 				statusCode(HttpStatus.OK.value())
-			}
-
-			val trip = Given {
-				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("38.0"), price = BigDecimal("50.0")))
-			} When {
-				post("/api/trips/$tripId/fuel")
-			} Then {
-				statusCode(HttpStatus.OK.value())
 			} Extract {
 				`as`(TripResponse::class.java)
 			}
+			rejected.fuel.shouldNotBeNull().rejectionReason shouldBe "Price too high"
+
+			val trip = Trips.logFuel(fleetManager, tripId, Trips.fuelBody(liters = "38.0", price = "50.0", receiptPhoto = Trips.OTHER_RECEIPT_PHOTO))
 			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+			trip.fuel.shouldNotBeNull().rejectionReason.shouldBeNull()
 			trip.status shouldBe TripStatus.COMPLETED
+
+			// The resubmitted receipt replaces the rejected one
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("receiptPhoto", equalTo(Trips.OTHER_RECEIPT_PHOTO))
+			}
+			jdbc.queryForObject("SELECT count(*) FROM fuel_receipt WHERE trip_id = ?", Int::class.java, UUID.fromString(tripId)) shouldBe 1
+		}
+	}
+
+	describe("GET /api/trips/{id}/fuel/receipt") {
+		it("returns the receipt to the trip's driver and to a Fleet Manager, while trip responses only flag it") {
+			val fleetManager = Accounts.createOrganization()
+			val driver = Accounts.memberOf(fleetManager, Role.DRIVER)
+			val tripId = Trips.createTripId(driver, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(driver, tripId)
+
+			for (token in listOf(driver, fleetManager)) {
+				Given {
+					withBearer(token)
+				} When {
+					get("/api/trips/$tripId/fuel/receipt")
+				} Then {
+					statusCode(HttpStatus.OK.value())
+					body("receiptPhoto", equalTo(Trips.RECEIPT_PHOTO))
+				}
+			}
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("[0].fuel.hasReceipt", equalTo(true))
+				body(not(containsString(Trips.RECEIPT_PHOTO)))
+			}
+		}
+
+		it("stores the receipt as its decoded bytes and image type, not as the data URL") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(fleetManager, tripId)
+
+			val stored = jdbc.queryForMap("SELECT content_type, photo FROM fuel_receipt WHERE trip_id = ?", UUID.fromString(tripId))
+			stored["content_type"] shouldBe "image/png"
+			(stored["photo"] as ByteArray) shouldBe Base64.getDecoder().decode(Trips.RECEIPT_PHOTO.substringAfter(","))
+		}
+
+		it("reports hasReceipt = false and 404 for a fuel entry whose receipt is gone") {
+			// e.g. one the 005 migration couldn't convert because it wasn't a base64 data URL
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(fleetManager, tripId)
+			jdbc.update("DELETE FROM fuel_receipt WHERE trip_id = ?", UUID.fromString(tripId))
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("[0].fuel.status", equalTo("PENDING"))
+				body("[0].fuel.hasReceipt", equalTo(false))
+			}
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("FUEL_RECEIPT_NOT_FOUND"))
+			}
+		}
+
+		it("returns 403 for another Driver and for an Accountant") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(fleetManager, tripId)
+
+			for (role in listOf(Role.DRIVER, Role.ACCOUNTANT)) {
+				Given {
+					withBearer(Accounts.memberOf(fleetManager, role))
+				} When {
+					get("/api/trips/$tripId/fuel/receipt")
+				} Then {
+					statusCode(HttpStatus.FORBIDDEN.value())
+				}
+			}
+		}
+
+		it("returns 404 FUEL_RECEIPT_NOT_FOUND for a trip without a fuel entry") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("FUEL_RECEIPT_NOT_FOUND"))
+			}
+		}
+
+		it("returns 404 TRIP_NOT_FOUND for another tenant's trip") {
+			val otherFleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(otherFleetManager, Vehicles.createVehicleId(otherFleetManager))
+
+			Given {
+				asRole(Role.FLEET_MANAGER)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("TRIP_NOT_FOUND"))
+			}
 		}
 	}
 
@@ -398,6 +842,21 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/cancel")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLANNED"))
+			}
+		}
+	}
+
+	describe("GET /api/trips/{id}") {
+		it("returns 400 MALFORMED_REQUEST naming the path variable when the id isn't a UUID") {
+			Given {
+				asRole(Role.FLEET_MANAGER)
+			} When {
+				get("/api/trips/not-a-uuid")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
+				body("field", equalTo("tripId"))
 			}
 		}
 	}

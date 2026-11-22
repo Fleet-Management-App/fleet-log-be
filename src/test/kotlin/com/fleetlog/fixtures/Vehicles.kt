@@ -13,9 +13,10 @@ import java.util.UUID
 /** Registers vehicles through the real HTTP API. */
 object Vehicles {
 
-	fun uniquePlate() = "P-${UUID.randomUUID()}".take(20)
+	/** Already in stored (normalised) form, so tests can compare it with what comes back. */
+	fun uniquePlate() = "P-${UUID.randomUUID()}".take(20).uppercase()
 
-	fun uniqueVin() = "VIN-${UUID.randomUUID()}".take(32)
+	fun uniqueVin() = "VIN-${UUID.randomUUID()}".take(32).uppercase()
 
 	fun vehicleRequest(
 		plate: String = uniquePlate(),
@@ -51,5 +52,15 @@ object Vehicles {
 
 	fun createVehicleId(token: String, stkDueDate: String? = null): String =
 		createVehicle(token, stkDueDate = stkDueDate).id.toString()
+
+	/** There is no detail endpoint, so this picks the vehicle out of the list. */
+	fun getVehicle(token: String, vehicleId: String): VehicleResponse =
+		Given { withBearer(token) } When {
+			get("/api/vehicles")
+		} Then {
+			statusCode(200)
+		} Extract {
+			`as`(Array<VehicleResponse>::class.java).single { it.id.toString() == vehicleId }
+		}
 
 }

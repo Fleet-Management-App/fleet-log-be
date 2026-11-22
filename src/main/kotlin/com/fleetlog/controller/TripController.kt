@@ -30,6 +30,8 @@ class TripController(
 
 	override fun logFuel(tripId: UUID, request: TripFuelRequest) = tripService.logFuel(tripId, request)
 
+	override fun getFuelReceipt(tripId: UUID) = tripService.getFuelReceipt(tripId)
+
 	override fun decideFuel(tripId: UUID, request: TripFuelDecisionRequest) = tripService.decideFuel(tripId, request)
 
 	override fun cancelTrip(tripId: UUID) = tripService.cancel(tripId)

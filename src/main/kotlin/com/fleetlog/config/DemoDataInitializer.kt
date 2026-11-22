@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * Demo accounts for presenting the app (DEMO_DATA_ENABLED=true). All passwords are [DEMO_PASSWORD].
+ * Demo accounts for presenting and testing the app, in every environment (DEMO_DATA_ENABLED, default true;
+ * documented on Confluence "Infrastructure, CI/CD & Deployment"). All passwords are [DEMO_PASSWORD].
  *
  * - "Demo Fleet s.r.o.": jana (Fleet Manager), petr (Driver), eva (Accountant)
  * - "Horská doprava a.s.": tomas (Fleet Manager who also drives) and jana as a Driver, to show that

@@ -15,6 +15,7 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.equalTo
 import org.springframework.http.HttpStatus
 import java.util.UUID
 
@@ -41,6 +42,8 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/auth/sign-up")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("EMAIL_TAKEN"))
+				body("field", equalTo("email"))
 			}
 		}
 
@@ -73,6 +76,7 @@ class AuthControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/auth/login")
 			} Then {
 				statusCode(HttpStatus.UNAUTHORIZED.value())
+				body("code", equalTo("WRONG_CREDENTIALS"))
 			}
 		}
 

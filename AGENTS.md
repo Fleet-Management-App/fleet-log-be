@@ -14,13 +14,13 @@
   1. **Plan Approved/Rejected** — the Fleet Manager approves the plan (including the chosen vehicle) BEFORE the trip happens.
   2. **Fuel Approval** — independent, optional, triggered ONLY by adding a fuel receipt. It never blocks trip completion (which happens as soon as the odometer is logged).
 * **Simple deterministic logic for the MVP:** No ML models for anomaly detection at this stage. Use clear rules (e.g. odometer gap between the end of one trip and the start of the next > tolerance, default 10 km, configurable by the Fleet Manager).
-* **Business Rules as the single source of truth:** All domain validation logic (BR-01 through BR-11+) is centralized in Confluence on the "04. Business Rules & Validations" page. When implementing validations, always reference the specific BR-ID — do not duplicate rules directly in code without a reference.
+* **Business Rules as the single source of truth:** All domain validation logic (BR-01 through BR-11+) is centralized in Confluence on the "02. Business Rules & Validations" page. When implementing validations, always reference the specific BR-ID — do not duplicate rules directly in code without a reference.
 * **Export, not a reporting dashboard:** The Accountant primarily needs an Excel export of financial history (fuel, service) — not a complex BI dashboard. Don't build unnecessarily complex aggregation layers beyond MVP scope (Simple statistics = basic figures, not analytics).
 
 ## 3. Prompting & AI Behavior Instructions
 * When designing a new feature, always ask: "Does this design violate the 'no persistent vehicle assignment' model and the two-phase approval (plan vs. fuel)?"
 * Generated code must respect that Fuel Approval is independent and optional — never implement it as a gating condition for the "Completed" state.
-* When writing or changing business logic, always check the current BR-IDs on the Confluence "04. Business Rules & Validations" page first — never duplicate or rewrite rules locally without a reference.
+* When writing or changing business logic, always check the current BR-IDs on the Confluence "02. Business Rules & Validations" page first — never duplicate or rewrite rules locally without a reference.
 * Integration logic testing (especially calls to any future external system) is done via mocking, not by calling real services.
 
 **Code quality policy:**

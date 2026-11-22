@@ -7,6 +7,9 @@ import java.util.UUID
 data class TripResponse(
 	val id: UUID,
 	val vehicleId: UUID,
+	val driverId: UUID,
+	/** The driver's name, so the Fleet Manager's approval queue can show who is asking. */
+	val driverName: String,
 	val dateTime: Instant,
 	val fromLocation: String,
 	val toLocation: String,

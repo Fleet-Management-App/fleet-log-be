@@ -5,8 +5,10 @@ import io.kotest.extensions.spring.SpringExtension
 import io.restassured.RestAssured
 import io.restassured.builder.RequestSpecBuilder
 import io.restassured.http.ContentType
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -16,6 +18,10 @@ abstract class BaseFleetLogBeIntegrationTest(body: BaseFleetLogBeIntegrationTest
 
 	@LocalServerPort
 	private var port: Int = 0
+
+	/** For arranging state the API can't produce (yet), e.g. suspending a vehicle; assertions go through the API. */
+	@Autowired
+	lateinit var jdbc: JdbcTemplate
 
 	init {
 		extension(SpringExtension())
@@ -28,8 +34,9 @@ abstract class BaseFleetLogBeIntegrationTest(body: BaseFleetLogBeIntegrationTest
 
 	companion object {
 
-		// One container for the whole test run, shared by every integration spec
-		private val postgres = PostgreSQLContainer("postgres:18-alpine").apply { start() }
+		// One container for the whole test run, shared by every integration spec. Not private: a
+		// migration test creates a scratch database of its own in it.
+		internal val postgres = PostgreSQLContainer("postgres:18-alpine").apply { start() }
 
 		@JvmStatic
 		@DynamicPropertySource
