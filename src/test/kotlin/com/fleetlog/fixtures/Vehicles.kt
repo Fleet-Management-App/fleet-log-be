@@ -13,9 +13,10 @@ import java.util.UUID
 /** Registers vehicles through the real HTTP API. */
 object Vehicles {
 
-	fun uniquePlate() = "P-${UUID.randomUUID()}".take(20)
+	/** Already in stored (normalised) form, so tests can compare it with what comes back. */
+	fun uniquePlate() = "P-${UUID.randomUUID()}".take(20).uppercase()
 
-	fun uniqueVin() = "VIN-${UUID.randomUUID()}".take(32)
+	fun uniqueVin() = "VIN-${UUID.randomUUID()}".take(32).uppercase()
 
 	fun vehicleRequest(
 		plate: String = uniquePlate(),
