@@ -19,6 +19,7 @@ fleetlog:
     token-lifetime: ${JWT_LIFETIME:8h}
     # Comma-separated list of origins allowed to call the API from a browser
     cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5180}
-  # Creates a demo organization with one user per role on startup (see DemoDataInitializer)
+  # Demo accounts in every environment (Confluence "Infrastructure, CI/CD & Deployment" → Demo accounts);
+  # created on first start, skipped when they already exist (see DemoDataInitializer)
   demo-data:
-    enabled: ${DEMO_DATA_ENABLED:false}
+    enabled: ${DEMO_DATA_ENABLED:true}
