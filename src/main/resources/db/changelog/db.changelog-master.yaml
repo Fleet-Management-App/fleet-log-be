@@ -1,0 +1,17 @@
+# Liquibase master changelog: the database schema is built by applying these files in this order.
+# A new change is a new numbered SQL file under changes/, appended to the end of this list.
+# A changeset that has been applied anywhere is never edited: Liquibase checks its checksum on
+# every start and refuses to run when it has changed. Fix a mistake with a new change instead.
+databaseChangeLog:
+  - include:
+      file: changes/001-accounts-and-organizations.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/002-vehicles-and-trips.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/003-multiple-roles-per-membership.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/004-normalised-vehicle-plate-and-vin.sql
+      relativeToChangelogFile: true

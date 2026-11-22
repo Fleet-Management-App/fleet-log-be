@@ -1,3 +1,6 @@
+--liquibase formatted sql
+
+--changeset fleetlog:001-accounts-and-organizations
 -- Global accounts: one per person, not tied to any organization.
 CREATE TABLE app_user
 (
