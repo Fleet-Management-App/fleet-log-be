@@ -14,6 +14,7 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.equalTo
 import org.springframework.http.HttpStatus
 
 /** Deliberately missing every field but `plate`, to exercise the 400 path — `VehicleCreateRequest` has none optional. */
@@ -62,13 +63,40 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 		}
 
-		it("returns 400 for a missing field") {
+		it("returns 400 for a missing field, naming it") {
 			Given {
 				asRole(Role.FLEET_MANAGER).body(IncompleteVehicleCreateRequest(Vehicles.uniquePlate()))
 			} When {
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
+				body("field", equalTo("vin"))
+			}
+		}
+
+		it("returns 400 VALIDATION_FAILED naming each failed field and its constraint") {
+			Given {
+				asRole(Role.FLEET_MANAGER).body(Vehicles.vehicleRequest(plate = " ", vin = "X".repeat(33)))
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("VALIDATION_FAILED"))
+				body("errors.size()", equalTo(2))
+				body("errors.find { it.field == 'plate' }.code", equalTo("NotBlank"))
+				body("errors.find { it.field == 'vin' }.code", equalTo("Size"))
+			}
+		}
+
+		it("returns 400 MALFORMED_REQUEST for a body that isn't JSON") {
+			Given {
+				asRole(Role.FLEET_MANAGER).body("{not json")
+			} When {
+				post("/api/vehicles")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
 			}
 		}
 
@@ -83,6 +111,8 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_PLATE_TAKEN"))
+				body("field", equalTo("plate"))
 			}
 		}
 
@@ -97,6 +127,8 @@ class VehicleControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/vehicles")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("VEHICLE_VIN_TAKEN"))
+				body("field", equalTo("vin"))
 			}
 		}
 

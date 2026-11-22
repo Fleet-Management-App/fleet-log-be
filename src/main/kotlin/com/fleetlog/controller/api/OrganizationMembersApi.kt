@@ -4,6 +4,7 @@ import com.fleetlog.dto.ChangeRolesRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.dto.InvitationResponse
 import com.fleetlog.dto.MemberResponse
+import com.fleetlog.exception.ApiProblem
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -31,12 +31,12 @@ interface OrganizationMembersApi {
 	fun listMembers(): List<MemberResponse>
 
 	@Operation(summary = "Replace a member's roles", description = "A member can hold several roles, e.g. a Fleet Manager who also drives.")
-	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
+	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))])
 	@PutMapping("/members/{userId}/roles")
 	fun changeMemberRoles(@PathVariable userId: UUID, @Valid @RequestBody request: ChangeRolesRequest): MemberResponse
 
 	@Operation(summary = "Remove a member from the organization (their account stays)")
-	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
+	@ApiResponse(responseCode = "409", description = "Would leave the organization without a Fleet Manager", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))])
 	@DeleteMapping("/members/{userId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	fun removeMember(@PathVariable userId: UUID)
@@ -46,7 +46,7 @@ interface OrganizationMembersApi {
 	fun listInvitations(): List<InvitationResponse>
 
 	@Operation(summary = "Invite a person by e-mail")
-	@ApiResponse(responseCode = "409", description = "Already a member, or already invited", content = [Content(schema = Schema(implementation = ProblemDetail::class))])
+	@ApiResponse(responseCode = "409", description = "Already a member, or already invited", content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))])
 	@PostMapping("/invitations")
 	@ResponseStatus(HttpStatus.CREATED)
 	fun createInvitation(@Valid @RequestBody request: CreateInvitationRequest): InvitationResponse

@@ -22,6 +22,7 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.equalTo
 import org.springframework.http.HttpStatus
 import java.math.BigDecimal
 
@@ -53,6 +54,8 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/trips")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("VEHICLE_UNAVAILABLE"))
+				body("field", equalTo("vehicleId"))
 			}
 		}
 
@@ -65,6 +68,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/trips")
 			} Then {
 				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("VEHICLE_NOT_FOUND"))
 			}
 		}
 
@@ -119,6 +123,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/plan-approval")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLANNED"))
 			}
 		}
 
@@ -191,6 +196,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/plan")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_REJECTED"))
 			}
 		}
 	}
@@ -206,6 +212,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/odometer")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLAN_APPROVED"))
 			}
 		}
 
@@ -226,6 +233,8 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/odometer")
 			} Then {
 				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("ODOMETER_END_BEFORE_START"))
+				body("field", equalTo("odometerEndKm"))
 			}
 		}
 
@@ -308,6 +317,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				post("/api/trips/$tripId/fuel")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("FUEL_ENTRY_ALREADY_EXISTS"))
 			}
 		}
 
@@ -321,6 +331,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/fuel-approval")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("NO_FUEL_ENTRY"))
 			}
 		}
 
@@ -412,6 +423,21 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				patch("/api/trips/$tripId/cancel")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+				body("code", equalTo("TRIP_NOT_PLANNED"))
+			}
+		}
+	}
+
+	describe("GET /api/trips/{id}") {
+		it("returns 400 MALFORMED_REQUEST naming the path variable when the id isn't a UUID") {
+			Given {
+				asRole(Role.FLEET_MANAGER)
+			} When {
+				get("/api/trips/not-a-uuid")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("MALFORMED_REQUEST"))
+				body("field", equalTo("tripId"))
 			}
 		}
 	}

@@ -5,6 +5,7 @@ import com.fleetlog.dto.VehicleResponse
 import com.fleetlog.entity.Role
 import com.fleetlog.entity.Vehicle
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.mapper.VehicleMapper
 import com.fleetlog.repository.OrganizationRepository
 import com.fleetlog.repository.VehicleRepository
@@ -27,10 +28,10 @@ class VehicleService(
 		val tenantId = currentUser.getTenantId()
 		if (!currentUser.getPrincipal().hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Fleet Manager role required")
 		if (vehicleRepository.existsByOrganizationIdAndPlate(tenantId, request.plate)) {
-			throw ConflictException("A vehicle with this plate already exists")
+			throw ConflictException("A vehicle with this plate already exists", ErrorCode.VEHICLE_PLATE_TAKEN, "plate")
 		}
 		if (vehicleRepository.existsByOrganizationIdAndVin(tenantId, request.vin)) {
-			throw ConflictException("A vehicle with this VIN already exists")
+			throw ConflictException("A vehicle with this VIN already exists", ErrorCode.VEHICLE_VIN_TAKEN, "vin")
 		}
 		val vehicle = vehicleRepository.save(
 			Vehicle(

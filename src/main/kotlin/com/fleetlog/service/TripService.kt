@@ -14,6 +14,7 @@ import com.fleetlog.entity.Vehicle
 import com.fleetlog.entity.VehicleStatus
 import com.fleetlog.exception.BadRequestException
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.exception.NotFoundException
 import com.fleetlog.mapper.TripMapper
 import com.fleetlog.repository.AppUserRepository
@@ -63,7 +64,7 @@ class TripService(
 	/** Edits and resubmits a plan-rejected trip's plan, incl. the vehicle choice (BR-07); returns it to PLANNED. */
 	fun updatePlan(tripId: UUID, request: TripCreateRequest): TripResponse {
 		val trip = findVisible(tripId)
-		if (trip.status != TripStatus.PLAN_REJECTED) throw ConflictException("Only a plan-rejected trip can be edited")
+		if (trip.status != TripStatus.PLAN_REJECTED) throw ConflictException("Only a plan-rejected trip can be edited", ErrorCode.TRIP_NOT_PLAN_REJECTED)
 		trip.vehicle = resolveAvailableVehicle(trip.organization.id, request.vehicleId)
 		trip.dateTime = request.dateTime
 		trip.fromLocation = request.fromLocation
@@ -94,7 +95,7 @@ class TripService(
 	fun decidePlan(tripId: UUID, request: TripPlanDecisionRequest): TripResponse {
 		requireFleetManager()
 		val trip = findInTenant(tripId)
-		if (trip.status != TripStatus.PLANNED) throw ConflictException("Trip plan is not awaiting approval")
+		if (trip.status != TripStatus.PLANNED) throw ConflictException("Trip plan is not awaiting approval", ErrorCode.TRIP_NOT_PLANNED)
 		if (request.approved) {
 			trip.status = TripStatus.PLAN_APPROVED
 			trip.rejectionReason = null
@@ -108,8 +109,8 @@ class TripService(
 	/** Completes the trip (BR-05); fuel, if any, is a separate concern and never blocks this. */
 	fun logOdometer(tripId: UUID, request: TripOdometerRequest): TripResponse {
 		val trip = findVisible(tripId)
-		if (trip.status != TripStatus.PLAN_APPROVED) throw ConflictException("Trip plan has not been approved") // BR-03
-		if (request.odometerEndKm < request.odometerStartKm) throw BadRequestException("Odometer end must be >= start") // BR-04
+		if (trip.status != TripStatus.PLAN_APPROVED) throw ConflictException("Trip plan has not been approved", ErrorCode.TRIP_NOT_PLAN_APPROVED) // BR-03
+		if (request.odometerEndKm < request.odometerStartKm) throw BadRequestException("Odometer end must be >= start", ErrorCode.ODOMETER_END_BEFORE_START, "odometerEndKm") // BR-04
 		trip.odometerStartKm = request.odometerStartKm
 		trip.odometerEndKm = request.odometerEndKm
 		trip.status = TripStatus.COMPLETED
@@ -120,7 +121,7 @@ class TripService(
 	fun logFuel(tripId: UUID, request: TripFuelRequest): TripResponse {
 		val trip = findVisible(tripId)
 		if (trip.fuelStatus == FuelStatus.PENDING || trip.fuelStatus == FuelStatus.APPROVED) {
-			throw ConflictException("A fuel entry already exists for this trip")
+			throw ConflictException("A fuel entry already exists for this trip", ErrorCode.FUEL_ENTRY_ALREADY_EXISTS)
 		}
 		trip.fuelLiters = request.liters
 		trip.fuelPrice = request.price
@@ -134,7 +135,7 @@ class TripService(
 	fun decideFuel(tripId: UUID, request: TripFuelDecisionRequest): TripResponse {
 		requireFleetManager()
 		val trip = findInTenant(tripId)
-		if (trip.fuelStatus == null) throw ConflictException("No fuel entry to decide on")
+		if (trip.fuelStatus == null) throw ConflictException("No fuel entry to decide on", ErrorCode.NO_FUEL_ENTRY)
 		if (request.approved) {
 			trip.fuelStatus = FuelStatus.APPROVED
 			trip.fuelRejectionReason = null
@@ -147,12 +148,12 @@ class TripService(
 
 	fun cancel(tripId: UUID) {
 		val trip = findVisible(tripId)
-		if (trip.status != TripStatus.PLANNED) throw ConflictException("Only a still-planned trip can be cancelled")
+		if (trip.status != TripStatus.PLANNED) throw ConflictException("Only a still-planned trip can be cancelled", ErrorCode.TRIP_NOT_PLANNED)
 		trip.status = TripStatus.CANCELLED
 	}
 
 	private fun findInTenant(tripId: UUID): Trip =
-		tripRepository.findByIdAndOrganizationId(tripId, currentUser.getTenantId()) ?: throw NotFoundException("Trip not found")
+		tripRepository.findByIdAndOrganizationId(tripId, currentUser.getTenantId()) ?: throw NotFoundException("Trip not found", ErrorCode.TRIP_NOT_FOUND)
 
 	/** Driver sees/acts on own trips only; Fleet Manager on any trip in the tenant; Accountant never. */
 	private fun findVisible(tripId: UUID): Trip {
@@ -177,9 +178,9 @@ class TripService(
 
 	/** Looks the vehicle up in the tenant and enforces BR-01 (suspended or STK-expired vehicles can't be (re)selected). */
 	private fun resolveAvailableVehicle(tenantId: UUID, vehicleId: UUID): Vehicle {
-		val vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, tenantId) ?: throw NotFoundException("Vehicle not found")
+		val vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, tenantId) ?: throw NotFoundException("Vehicle not found", ErrorCode.VEHICLE_NOT_FOUND, "vehicleId")
 		if (vehicle.status == VehicleStatus.SUSPENDED || isStkExpired(vehicle)) {
-			throw BadRequestException("Vehicle is suspended or its STK has expired")
+			throw BadRequestException("Vehicle is suspended or its STK has expired", ErrorCode.VEHICLE_UNAVAILABLE, "vehicleId")
 		}
 		return vehicle
 	}
