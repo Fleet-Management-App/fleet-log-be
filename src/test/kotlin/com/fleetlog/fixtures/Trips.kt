@@ -16,8 +16,11 @@ import java.util.UUID
 /** Plans trips and moves them through their lifecycle via the real HTTP API. */
 object Trips {
 
-	/** The smallest valid PNG data URL: a fuel entry always comes with a receipt (BR-06). */
-	const val RECEIPT_PHOTO = "data:image/png;base64,iVBORw0KGgo="
+	/** A 1x1 PNG as a data URL: a fuel entry always comes with a receipt (BR-14). */
+	const val RECEIPT_PHOTO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+
+	/** A second, different receipt (the start of a JPEG), for replacing the first one. */
+	const val OTHER_RECEIPT_PHOTO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2w=="
 
 	// Not named "body": inside a `Given { }` block that name resolves to RequestSpecification's own
 	// member instead of this one, silently sending the wrong thing as the request body.

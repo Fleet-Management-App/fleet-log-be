@@ -23,6 +23,12 @@ enum class ErrorCode {
 	FUEL_ENTRY_NOT_PENDING,
 	NO_FUEL_ENTRY,
 	FUEL_RECEIPT_NOT_FOUND,
+
+	/** 400: the receipt photo isn't a base64 data URL of an accepted image type (JPEG, PNG, WebP, HEIC/HEIF). */
+	RECEIPT_PHOTO_INVALID,
+
+	/** 400: the receipt photo is larger than the limit (5 MiB decoded). */
+	RECEIPT_PHOTO_TOO_LARGE,
 	REJECTION_REASON_REQUIRED,
 
 	// Vehicles (SPEC-01)

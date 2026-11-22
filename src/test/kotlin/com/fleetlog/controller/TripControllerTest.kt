@@ -13,6 +13,7 @@ import com.fleetlog.fixtures.Trips
 import com.fleetlog.fixtures.Vehicles
 import com.fleetlog.fixtures.asRole
 import com.fleetlog.fixtures.withBearer
+import com.fleetlog.service.TripService
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -26,6 +27,7 @@ import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.not
 import org.springframework.http.HttpStatus
+import java.util.Base64
 import java.util.UUID
 
 class TripControllerTest : BaseFleetLogBeIntegrationTest({
@@ -411,7 +413,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 		}
 
-		it("returns 400 VALIDATION_FAILED for a blank receipt (BR-06)") {
+		it("returns 400 VALIDATION_FAILED for a blank receipt (BR-14)") {
 			val fleetManager = Accounts.createOrganization()
 			val tripId = approvedAndCompletedTrip(fleetManager)
 
@@ -427,7 +429,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 		}
 
-		it("returns 400 naming receiptPhoto when there is no receipt at all (BR-06)") {
+		it("returns 400 naming receiptPhoto when there is no receipt at all (BR-14)") {
 			val fleetManager = Accounts.createOrganization()
 			val tripId = approvedAndCompletedTrip(fleetManager)
 
@@ -439,6 +441,80 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				statusCode(HttpStatus.BAD_REQUEST.value())
 				body("code", equalTo("MALFORMED_REQUEST"))
 				body("field", equalTo("receiptPhoto"))
+			}
+		}
+
+		it("returns 400 RECEIPT_PHOTO_INVALID for a receipt that isn't a base64 image data URL, logging nothing") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = approvedAndCompletedTrip(fleetManager)
+			val invalidReceipts = listOf(
+				"data:application/pdf;base64,JVBERi0xLjQ=", // not an image
+				"data:image/gif;base64,R0lGODlhAQABAAAAACw=", // an image, but not an accepted type
+				"data:image/png;base64,not*base64!", // bad base64
+				"data:image/png;base64,", // nothing in it
+				"data:image/png,iVBORw0KGgo=", // not base64-encoded
+				"data:image/png;charset=utf-8;base64,iVBORw0KGgo=", // parameters aren't accepted
+				"iVBORw0KGgo=", // base64 without the data URL around it
+			)
+
+			for (receiptPhoto in invalidReceipts) {
+				Given {
+					withBearer(fleetManager).body(Trips.fuelBody(receiptPhoto = receiptPhoto))
+				} When {
+					post("/api/trips/$tripId/fuel")
+				} Then {
+					statusCode(HttpStatus.BAD_REQUEST.value())
+					body("code", equalTo("RECEIPT_PHOTO_INVALID"))
+					body("field", equalTo("receiptPhoto"))
+				}
+			}
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("fuel", equalTo(null))
+			}
+			jdbc.queryForObject("SELECT count(*) FROM fuel_receipt WHERE trip_id = ?", Int::class.java, UUID.fromString(tripId)) shouldBe 0
+		}
+
+		it("accepts a receipt of exactly 5 MiB and returns 400 RECEIPT_PHOTO_TOO_LARGE for one byte more") {
+			val fleetManager = Accounts.createOrganization()
+			val tooLargeTripId = approvedAndCompletedTrip(fleetManager)
+			val maxSizeTripId = approvedAndCompletedTrip(fleetManager)
+			fun jpegOfSize(size: Int) = "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(ByteArray(size))
+
+			Given {
+				withBearer(fleetManager).body(Trips.fuelBody(receiptPhoto = jpegOfSize(TripService.MAX_RECEIPT_PHOTO_BYTES + 1)))
+			} When {
+				post("/api/trips/$tooLargeTripId/fuel")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
+				body("code", equalTo("RECEIPT_PHOTO_TOO_LARGE"))
+				body("field", equalTo("receiptPhoto"))
+			}
+
+			Trips.logFuel(fleetManager, maxSizeTripId, Trips.fuelBody(receiptPhoto = jpegOfSize(TripService.MAX_RECEIPT_PHOTO_BYTES)))
+				.fuel.shouldNotBeNull().hasReceipt shouldBe true
+		}
+
+		it("accepts every allowed image type, matching the media type case-insensitively") {
+			val fleetManager = Accounts.createOrganization()
+
+			for (contentType in listOf("image/jpeg", "image/png", "image/webp", "image/heic", "IMAGE/HEIF")) {
+				val tripId = approvedAndCompletedTrip(fleetManager)
+				Trips.logFuel(fleetManager, tripId, Trips.fuelBody(receiptPhoto = "data:$contentType;BASE64,AAECAw=="))
+
+				Given {
+					withBearer(fleetManager)
+				} When {
+					get("/api/trips/$tripId/fuel/receipt")
+				} Then {
+					statusCode(HttpStatus.OK.value())
+					body("receiptPhoto", equalTo("data:${contentType.lowercase()};base64,AAECAw=="))
+				}
 			}
 		}
 
@@ -603,10 +679,21 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 			rejected.fuel.shouldNotBeNull().rejectionReason shouldBe "Price too high"
 
-			val trip = Trips.logFuel(fleetManager, tripId, Trips.fuelBody(liters = "38.0", price = "50.0"))
+			val trip = Trips.logFuel(fleetManager, tripId, Trips.fuelBody(liters = "38.0", price = "50.0", receiptPhoto = Trips.OTHER_RECEIPT_PHOTO))
 			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
 			trip.fuel.shouldNotBeNull().rejectionReason.shouldBeNull()
 			trip.status shouldBe TripStatus.COMPLETED
+
+			// The resubmitted receipt replaces the rejected one
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("receiptPhoto", equalTo(Trips.OTHER_RECEIPT_PHOTO))
+			}
+			jdbc.queryForObject("SELECT count(*) FROM fuel_receipt WHERE trip_id = ?", Int::class.java, UUID.fromString(tripId)) shouldBe 1
 		}
 	}
 
@@ -637,6 +724,44 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				statusCode(HttpStatus.OK.value())
 				body("[0].fuel.hasReceipt", equalTo(true))
 				body(not(containsString(Trips.RECEIPT_PHOTO)))
+			}
+		}
+
+		it("stores the receipt as its decoded bytes and image type, not as the data URL") {
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(fleetManager, tripId)
+
+			val stored = jdbc.queryForMap("SELECT content_type, photo FROM fuel_receipt WHERE trip_id = ?", UUID.fromString(tripId))
+			stored["content_type"] shouldBe "image/png"
+			(stored["photo"] as ByteArray) shouldBe Base64.getDecoder().decode(Trips.RECEIPT_PHOTO.substringAfter(","))
+		}
+
+		it("reports hasReceipt = false and 404 for a fuel entry whose receipt is gone") {
+			// e.g. one the 005 migration couldn't convert because it wasn't a base64 data URL
+			val fleetManager = Accounts.createOrganization()
+			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))
+			Trips.approvePlan(fleetManager, tripId)
+			Trips.logFuel(fleetManager, tripId)
+			jdbc.update("DELETE FROM fuel_receipt WHERE trip_id = ?", UUID.fromString(tripId))
+
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+				body("[0].fuel.status", equalTo("PENDING"))
+				body("[0].fuel.hasReceipt", equalTo(false))
+			}
+			Given {
+				withBearer(fleetManager)
+			} When {
+				get("/api/trips/$tripId/fuel/receipt")
+			} Then {
+				statusCode(HttpStatus.NOT_FOUND.value())
+				body("code", equalTo("FUEL_RECEIPT_NOT_FOUND"))
 			}
 		}
 

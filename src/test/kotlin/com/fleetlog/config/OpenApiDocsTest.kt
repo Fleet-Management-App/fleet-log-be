@@ -1,7 +1,6 @@
 package com.fleetlog.config
 
 import com.fleetlog.BaseFleetLogBeIntegrationTest
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.restassured.module.kotlin.extensions.Extract
@@ -25,7 +24,8 @@ class OpenApiDocsTest : BaseFleetLogBeIntegrationTest({
 			val docs = apiDocs()
 
 			docs.getMap<String, Any>("components.schemas.ApiProblem.properties").keys shouldContainAll listOf("code", "field", "errors")
-			docs.getList<String>("components.schemas.ApiProblem.properties.code.enum") shouldContain "TRIP_NOT_PLAN_APPROVED"
+			docs.getList<String>("components.schemas.ApiProblem.properties.code.enum") shouldContainAll
+				listOf("TRIP_NOT_PLAN_APPROVED", "RECEIPT_PHOTO_INVALID", "RECEIPT_PHOTO_TOO_LARGE")
 			docs.getList<String>("components.schemas.ApiFieldError.required") shouldContainAll listOf("field", "code")
 		}
 

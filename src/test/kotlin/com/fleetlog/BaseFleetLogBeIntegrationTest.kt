@@ -34,8 +34,9 @@ abstract class BaseFleetLogBeIntegrationTest(body: BaseFleetLogBeIntegrationTest
 
 	companion object {
 
-		// One container for the whole test run, shared by every integration spec
-		private val postgres = PostgreSQLContainer("postgres:18-alpine").apply { start() }
+		// One container for the whole test run, shared by every integration spec. Not private: a
+		// migration test creates a scratch database of its own in it.
+		internal val postgres = PostgreSQLContainer("postgres:18-alpine").apply { start() }
 
 		@JvmStatic
 		@DynamicPropertySource

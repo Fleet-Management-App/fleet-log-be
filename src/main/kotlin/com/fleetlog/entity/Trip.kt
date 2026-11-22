@@ -9,6 +9,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.Formula
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -16,6 +17,7 @@ import java.util.UUID
 /**
  * A planned/driven trip (SPEC-02). Fuel fields live flat on the trip: there is always at most one
  * fuel entry per trip, and it is never queried on its own, so a separate table would add nothing.
+ * The one exception is the receipt photo, which is big: it lives in [FuelReceipt].
  */
 @Entity
 @Table(name = "trip")
@@ -67,9 +69,6 @@ class Trip(
 	@Column(name = "fuel_price")
 	var fuelPrice: BigDecimal? = null,
 
-	@Column(name = "fuel_receipt_photo")
-	var fuelReceiptPhoto: String? = null,
-
 	@Enumerated(EnumType.STRING)
 	@Column(name = "fuel_status")
 	var fuelStatus: FuelStatus? = null,
@@ -79,4 +78,14 @@ class Trip(
 
 	@Column(name = "created_at", nullable = false)
 	val createdAt: Instant = Instant.now(),
-)
+) {
+
+	/**
+	 * Whether the fuel entry's receipt photo ([FuelReceipt]) exists. Computed by the database in the same
+	 * select that loads the trip, so a trip list knows it without reading any photo. Read-only: the
+	 * formula is evaluated only when the trip is loaded, so code that saves a receipt sets this too.
+	 */
+	@Formula("(SELECT EXISTS (SELECT 1 FROM fuel_receipt r WHERE r.trip_id = id))")
+	var hasFuelReceipt: Boolean = false
+
+}
