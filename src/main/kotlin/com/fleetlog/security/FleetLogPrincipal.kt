@@ -13,4 +13,6 @@ data class FleetLogPrincipal(
 	val email: String,
 	val tenantId: UUID?,
 	val roles: Set<Role>,
-)
+) {
+	fun hasRole(role: Role): Boolean = role in roles
+}
