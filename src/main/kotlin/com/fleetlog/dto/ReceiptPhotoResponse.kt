@@ -1,6 +1,6 @@
 package com.fleetlog.dto
 
 data class ReceiptPhotoResponse(
-	/** The receipt photo exactly as it was logged, a data URL. */
+	/** The receipt photo as a base64 data URL, rebuilt from the stored image type and bytes. */
 	val receiptPhoto: String,
 )

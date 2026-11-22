@@ -1,3 +1,6 @@
+--liquibase formatted sql
+
+--changeset fleetlog:004-normalised-vehicle-plate-and-vin
 -- Plates and VINs are stored normalised (FLOG-51): a plate trimmed, upper-case, inner whitespace
 -- collapsed to one space; a VIN upper-case with no whitespace at all. Existing rows are brought into
 -- that form first.

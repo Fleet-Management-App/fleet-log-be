@@ -57,10 +57,15 @@ interface TripApi {
 	fun logOdometer(@PathVariable tripId: UUID, @Valid @RequestBody request: TripOdometerRequest): TripResponse
 
 	@Operation(summary = "Log (or, if rejected, resubmit) the trip's optional fuel entry, with its receipt; the plan must be approved")
+	@ApiResponse(
+		responseCode = "400",
+		description = "Invalid request; for the receipt photo RECEIPT_PHOTO_INVALID or RECEIPT_PHOTO_TOO_LARGE, with field receiptPhoto",
+		content = [Content(mediaType = "application/problem+json", schema = Schema(implementation = ApiProblem::class))],
+	)
 	@PostMapping("/{tripId}/fuel")
 	fun logFuel(@PathVariable tripId: UUID, @Valid @RequestBody request: TripFuelRequest): TripResponse
 
-	@Operation(summary = "The fuel entry's receipt photo (a data URL); same visibility as the trip detail")
+	@Operation(summary = "The fuel entry's receipt photo (a base64 data URL); same visibility as the trip detail")
 	@ApiResponse(
 		responseCode = "404",
 		description = "Trip not found (TRIP_NOT_FOUND), or it has no fuel receipt (FUEL_RECEIPT_NOT_FOUND)",

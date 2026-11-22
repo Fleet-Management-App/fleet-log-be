@@ -1,3 +1,6 @@
+--liquibase formatted sql
+
+--changeset fleetlog:002-vehicles-and-trips
 -- A fleet vehicle, scoped to one organization (SPEC-01).
 CREATE TABLE vehicle
 (
