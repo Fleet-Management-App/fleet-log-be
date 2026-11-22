@@ -67,6 +67,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
 	)
 	fun handleBadCredentials(e: BadCredentialsException): ProblemDetail =
 		ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Wrong e-mail or password")
+			.apply { setProperty(CODE, ErrorCode.WRONG_CREDENTIALS.name) }
 
 	override fun handleMethodArgumentNotValid(
 		ex: MethodArgumentNotValidException,

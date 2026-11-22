@@ -17,6 +17,7 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import org.hamcrest.Matchers.equalTo
 import org.springframework.http.HttpStatus
 
 class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
@@ -226,6 +227,7 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 
 			Accounts.changeRoles(fleetManager, Accounts.getUserId(fleetManager), setOf(Role.DRIVER))
 				.statusCode(HttpStatus.CONFLICT.value())
+				.body("code", equalTo("LAST_FLEET_MANAGER"))
 		}
 
 		it("lets a Fleet Manager step down to Driver once someone else is a Fleet Manager") {

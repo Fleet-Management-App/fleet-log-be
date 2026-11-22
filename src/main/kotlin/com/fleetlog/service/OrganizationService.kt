@@ -12,6 +12,7 @@ import com.fleetlog.entity.Membership
 import com.fleetlog.entity.Organization
 import com.fleetlog.entity.Role
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.exception.NotFoundException
 import com.fleetlog.mapper.OrganizationMapper
 import com.fleetlog.repository.AppUserRepository
@@ -71,10 +72,10 @@ class OrganizationService(
 		val email = normalizeEmail(request.email)
 		val existingUser = userRepository.findByEmail(email)
 		if (existingUser != null && membershipRepository.existsByUserIdAndOrganizationId(existingUser.id, tenantId)) {
-			throw ConflictException("This person is already a member of the organization")
+			throw ConflictException("This person is already a member of the organization", ErrorCode.ALREADY_MEMBER, "email")
 		}
 		if (invitationRepository.existsByOrganizationIdAndEmailAndStatus(tenantId, email, InvitationStatus.PENDING)) {
-			throw ConflictException("This e-mail already has a pending invitation")
+			throw ConflictException("This e-mail already has a pending invitation", ErrorCode.INVITATION_ALREADY_PENDING, "email")
 		}
 		val invitation = invitationRepository.save(
 			Invitation(
@@ -94,21 +95,21 @@ class OrganizationService(
 
 	fun revokeInvitation(invitationId: UUID) {
 		val invitation = invitationRepository.findByIdAndOrganizationId(invitationId, currentUser.getTenantId())
-			?: throw NotFoundException("Invitation not found")
-		if (invitation.status != InvitationStatus.PENDING) throw ConflictException("Only a pending invitation can be revoked")
+			?: throw NotFoundException("Invitation not found", ErrorCode.INVITATION_NOT_FOUND)
+		if (invitation.status != InvitationStatus.PENDING) throw ConflictException("Only a pending invitation can be revoked", ErrorCode.INVITATION_NOT_PENDING)
 		invitation.status = InvitationStatus.REVOKED
 	}
 
 	private fun findMember(userId: UUID): Membership =
 		membershipRepository.findByUserIdAndOrganizationId(userId, currentUser.getTenantId())
-			?: throw NotFoundException("Member not found")
+			?: throw NotFoundException("Member not found", ErrorCode.MEMBER_NOT_FOUND)
 
 	// Not in the Business Rules page yet (gap to flag): without a Fleet Manager nobody could manage the organization
 	private fun ensureNotLastFleetManager(membership: Membership) {
 		if (Role.FLEET_MANAGER in membership.roles &&
 			membershipRepository.countByOrganizationIdAndRole(membership.organization.id, Role.FLEET_MANAGER) <= 1
 		) {
-			throw ConflictException("The organization needs at least one Fleet Manager")
+			throw ConflictException("The organization needs at least one Fleet Manager", ErrorCode.LAST_FLEET_MANAGER)
 		}
 	}
 

@@ -6,6 +6,7 @@ import com.fleetlog.entity.Invitation
 import com.fleetlog.entity.InvitationStatus
 import com.fleetlog.entity.Membership
 import com.fleetlog.exception.ConflictException
+import com.fleetlog.exception.ErrorCode
 import com.fleetlog.exception.NotFoundException
 import com.fleetlog.repository.AppUserRepository
 import com.fleetlog.repository.InvitationRepository
@@ -31,7 +32,7 @@ class InvitationService(
 	fun accept(invitationId: UUID): AuthTokenResponse {
 		val (user, invitation) = findOwnPendingInvitation(invitationId)
 		if (membershipRepository.existsByUserIdAndOrganizationId(user.id, invitation.organization.id)) {
-			throw ConflictException("You are already a member of this organization")
+			throw ConflictException("You are already a member of this organization", ErrorCode.ALREADY_MEMBER)
 		}
 		invitation.status = InvitationStatus.ACCEPTED
 		val membership = membershipRepository.save(
@@ -49,8 +50,8 @@ class InvitationService(
 		// Someone else's invitation answers 404 like a missing one, so ids can't be probed
 		val invitation = invitationRepository.findWithOrganizationById(invitationId)
 			?.takeIf { it.email == user.email }
-			?: throw NotFoundException("Invitation not found")
-		if (invitation.status != InvitationStatus.PENDING) throw ConflictException("This invitation is no longer pending")
+			?: throw NotFoundException("Invitation not found", ErrorCode.INVITATION_NOT_FOUND)
+		if (invitation.status != InvitationStatus.PENDING) throw ConflictException("This invitation is no longer pending", ErrorCode.INVITATION_NOT_PENDING)
 		return user to invitation
 	}
 
