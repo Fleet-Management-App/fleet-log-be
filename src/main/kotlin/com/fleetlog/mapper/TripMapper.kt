@@ -25,7 +25,7 @@ abstract class TripMapper {
 		return FuelEntryResponse(
 			liters = requireNotNull(trip.fuelLiters),
 			price = requireNotNull(trip.fuelPrice),
-			receiptPhotoUrl = trip.fuelReceiptPhoto,
+			hasReceipt = trip.fuelReceiptPhoto != null,
 			status = status,
 			rejectionReason = trip.fuelRejectionReason,
 		)

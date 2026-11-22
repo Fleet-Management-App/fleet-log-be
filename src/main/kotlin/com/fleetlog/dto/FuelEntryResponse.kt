@@ -6,7 +6,8 @@ import java.math.BigDecimal
 data class FuelEntryResponse(
 	val liters: BigDecimal,
 	val price: BigDecimal,
-	val receiptPhotoUrl: String?,
+	/** The photo itself is fetched separately (GET /api/trips/{tripId}/fuel/receipt), so lists stay small. */
+	val hasReceipt: Boolean,
 	val status: FuelStatus,
 	/** Set when the Fleet Manager rejected the fuel entry. */
 	val rejectionReason: String?,

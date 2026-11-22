@@ -1,5 +1,6 @@
 package com.fleetlog.service
 
+import com.fleetlog.dto.ReceiptPhotoResponse
 import com.fleetlog.dto.TripCreateRequest
 import com.fleetlog.dto.TripFuelDecisionRequest
 import com.fleetlog.dto.TripFuelRequest
@@ -91,17 +92,22 @@ class TripService(
 		return trips.filter { status == null || it.status == status }.map(tripMapper::toResponse)
 	}
 
-	/** Fleet Manager approves/rejects the plan, incl. the vehicle choice, before the trip happens. */
+	/**
+	 * Fleet Manager approves/rejects the plan, incl. the vehicle choice, before the trip happens. The
+	 * vehicle is checked against BR-01 again on approval: it may have been suspended, or its STK may
+	 * have run out, since the trip was planned.
+	 */
 	fun decidePlan(tripId: UUID, request: TripPlanDecisionRequest): TripResponse {
 		requireFleetManager()
 		val trip = findInTenant(tripId)
 		if (trip.status != TripStatus.PLANNED) throw ConflictException("Trip plan is not awaiting approval", ErrorCode.TRIP_NOT_PLANNED)
 		if (request.approved) {
+			requireAvailable(trip.vehicle, field = null)
 			trip.status = TripStatus.PLAN_APPROVED
 			trip.rejectionReason = null
 		} else {
+			trip.rejectionReason = requireRejectionReason(request.rejectionReason)
 			trip.status = TripStatus.PLAN_REJECTED
-			trip.rejectionReason = request.rejectionReason
 		}
 		return tripMapper.toResponse(trip)
 	}
@@ -114,12 +120,22 @@ class TripService(
 		trip.odometerStartKm = request.odometerStartKm
 		trip.odometerEndKm = request.odometerEndKm
 		trip.status = TripStatus.COMPLETED
+		// The vehicle's reading is what the next trip is compared against (BR-10/11). Trips may be
+		// logged out of order, so an older trip's lower reading must never wind it back.
+		trip.vehicle.odometerKm = maxOf(trip.vehicle.odometerKm, request.odometerEndKm)
 		return tripMapper.toResponse(trip)
 	}
 
-	/** A rejected fuel entry can be resubmitted through this same endpoint (BR-07); a pending/approved one can't be overwritten. */
+	/**
+	 * Fuel can be logged once the plan is approved, before or after the odometer (BR-03). A rejected
+	 * entry can be resubmitted through this same endpoint (BR-07); a pending/approved one can't be
+	 * overwritten.
+	 */
 	fun logFuel(tripId: UUID, request: TripFuelRequest): TripResponse {
 		val trip = findVisible(tripId)
+		if (trip.status != TripStatus.PLAN_APPROVED && trip.status != TripStatus.COMPLETED) {
+			throw ConflictException("Trip plan has not been approved", ErrorCode.TRIP_NOT_PLAN_APPROVED)
+		}
 		if (trip.fuelStatus == FuelStatus.PENDING || trip.fuelStatus == FuelStatus.APPROVED) {
 			throw ConflictException("A fuel entry already exists for this trip", ErrorCode.FUEL_ENTRY_ALREADY_EXISTS)
 		}
@@ -131,19 +147,31 @@ class TripService(
 		return tripMapper.toResponse(trip)
 	}
 
-	/** Independent of the trip's own status (BR-06). */
+	/** Independent of the trip's own status (BR-06); only a PENDING entry can be decided. */
 	fun decideFuel(tripId: UUID, request: TripFuelDecisionRequest): TripResponse {
 		requireFleetManager()
 		val trip = findInTenant(tripId)
-		if (trip.fuelStatus == null) throw ConflictException("No fuel entry to decide on", ErrorCode.NO_FUEL_ENTRY)
+		when (trip.fuelStatus) {
+			null -> throw ConflictException("No fuel entry to decide on", ErrorCode.NO_FUEL_ENTRY)
+			FuelStatus.PENDING -> {}
+			else -> throw ConflictException("The fuel entry has already been decided", ErrorCode.FUEL_ENTRY_NOT_PENDING)
+		}
 		if (request.approved) {
 			trip.fuelStatus = FuelStatus.APPROVED
 			trip.fuelRejectionReason = null
 		} else {
+			trip.fuelRejectionReason = requireRejectionReason(request.rejectionReason)
 			trip.fuelStatus = FuelStatus.REJECTED
-			trip.fuelRejectionReason = request.rejectionReason
 		}
 		return tripMapper.toResponse(trip)
+	}
+
+	/** The fuel receipt photo, kept out of [TripResponse] because of its size; same visibility as [get]. */
+	@Transactional(readOnly = true)
+	fun getFuelReceipt(tripId: UUID): ReceiptPhotoResponse {
+		val receiptPhoto = findVisible(tripId).fuelReceiptPhoto
+			?: throw NotFoundException("This trip has no fuel receipt", ErrorCode.FUEL_RECEIPT_NOT_FOUND)
+		return ReceiptPhotoResponse(receiptPhoto)
 	}
 
 	fun cancel(tripId: UUID) {
@@ -176,14 +204,25 @@ class TripService(
 		if (!currentUser.getPrincipal().hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Fleet Manager role required")
 	}
 
-	/** Looks the vehicle up in the tenant and enforces BR-01 (suspended or STK-expired vehicles can't be (re)selected). */
+	/** Looks the vehicle up in the tenant and enforces BR-01 on it. */
 	private fun resolveAvailableVehicle(tenantId: UUID, vehicleId: UUID): Vehicle {
-		val vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, tenantId) ?: throw NotFoundException("Vehicle not found", ErrorCode.VEHICLE_NOT_FOUND, "vehicleId")
+		val vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, tenantId)
+			?: throw NotFoundException("Vehicle not found", ErrorCode.VEHICLE_NOT_FOUND, "vehicleId")
+		return requireAvailable(vehicle, field = "vehicleId")
+	}
+
+	/** BR-01: a suspended or STK-expired vehicle can't be selected for, or approved on, a trip. */
+	private fun requireAvailable(vehicle: Vehicle, field: String?): Vehicle {
 		if (vehicle.status == VehicleStatus.SUSPENDED || isStkExpired(vehicle)) {
-			throw BadRequestException("Vehicle is suspended or its STK has expired", ErrorCode.VEHICLE_UNAVAILABLE, "vehicleId")
+			throw BadRequestException("Vehicle is suspended or its STK has expired", ErrorCode.VEHICLE_UNAVAILABLE, field)
 		}
 		return vehicle
 	}
+
+	/** A rejection (plan or fuel) must tell the driver why, so they can fix and resubmit it (BR-07). */
+	private fun requireRejectionReason(rejectionReason: String?): String =
+		rejectionReason?.trim()?.takeIf { it.isNotEmpty() }
+			?: throw BadRequestException("A rejection needs a reason", ErrorCode.REJECTION_REASON_REQUIRED, "rejectionReason")
 
 	private fun isStkExpired(vehicle: Vehicle): Boolean = vehicle.stkDueDate?.isBefore(LocalDate.now()) ?: false
 

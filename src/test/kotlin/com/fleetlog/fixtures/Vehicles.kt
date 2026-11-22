@@ -52,4 +52,14 @@ object Vehicles {
 	fun createVehicleId(token: String, stkDueDate: String? = null): String =
 		createVehicle(token, stkDueDate = stkDueDate).id.toString()
 
+	/** There is no detail endpoint, so this picks the vehicle out of the list. */
+	fun getVehicle(token: String, vehicleId: String): VehicleResponse =
+		Given { withBearer(token) } When {
+			get("/api/vehicles")
+		} Then {
+			statusCode(200)
+		} Extract {
+			`as`(Array<VehicleResponse>::class.java).single { it.id.toString() == vehicleId }
+		}
+
 }
