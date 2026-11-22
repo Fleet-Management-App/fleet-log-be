@@ -8,4 +8,6 @@ data class FuelEntryResponse(
 	val price: BigDecimal,
 	val receiptPhotoUrl: String?,
 	val status: FuelStatus,
+	/** Set when the Fleet Manager rejected the fuel entry. */
+	val rejectionReason: String?,
 )

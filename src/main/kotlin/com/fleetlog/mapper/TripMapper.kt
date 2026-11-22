@@ -15,6 +15,8 @@ import org.mapstruct.Mapping
 abstract class TripMapper {
 
 	@Mapping(source = "vehicle.id", target = "vehicleId")
+	@Mapping(source = "driver.id", target = "driverId")
+	@Mapping(source = "driver.fullName", target = "driverName")
 	@Mapping(target = "fuel", expression = "java(toFuelEntry(trip))")
 	abstract fun toResponse(trip: Trip): TripResponse
 
@@ -25,6 +27,7 @@ abstract class TripMapper {
 			price = requireNotNull(trip.fuelPrice),
 			receiptPhotoUrl = trip.fuelReceiptPhoto,
 			status = status,
+			rejectionReason = trip.fuelRejectionReason,
 		)
 	}
 

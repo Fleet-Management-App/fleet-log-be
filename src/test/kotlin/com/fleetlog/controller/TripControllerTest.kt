@@ -33,6 +33,16 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			Trips.createTrip(fleetManager, Vehicles.createVehicleId(fleetManager)).status shouldBe TripStatus.PLANNED
 		}
 
+		it("names the driver, so the Fleet Manager's approval queue can show who planned it") {
+			val fleetManager = Accounts.createOrganization()
+			val vehicleId = Vehicles.createVehicleId(fleetManager)
+			val driver = Accounts.memberOf(fleetManager, Role.DRIVER)
+
+			val trip = Trips.createTrip(driver, vehicleId)
+			trip.driverId.toString() shouldBe Accounts.getUserId(driver)
+			trip.driverName shouldBe Accounts.getMe(driver).fullName
+		}
+
 		it("returns 400 when the vehicle's STK has already expired (BR-01)") {
 			val fleetManager = Accounts.createOrganization()
 			val vehicleId = Vehicles.createVehicleId(fleetManager, stkDueDate = "2000-01-01")
@@ -345,13 +355,16 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			} Then {
 				statusCode(HttpStatus.OK.value())
 			}
-			Given {
+			val rejected = Given {
 				withBearer(fleetManager).body(TripFuelDecisionRequest(approved = false, rejectionReason = "Price too high"))
 			} When {
 				patch("/api/trips/$tripId/fuel-approval")
 			} Then {
 				statusCode(HttpStatus.OK.value())
+			} Extract {
+				`as`(TripResponse::class.java)
 			}
+			rejected.fuel.shouldNotBeNull().rejectionReason shouldBe "Price too high"
 
 			val trip = Given {
 				withBearer(fleetManager).body(TripFuelRequest(liters = BigDecimal("38.0"), price = BigDecimal("50.0")))
@@ -363,6 +376,7 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 				`as`(TripResponse::class.java)
 			}
 			trip.fuel.shouldNotBeNull().status shouldBe FuelStatus.PENDING
+			trip.fuel.shouldNotBeNull().rejectionReason.shouldBeNull()
 			trip.status shouldBe TripStatus.COMPLETED
 		}
 	}
