@@ -35,7 +35,7 @@ class InvitationService(
 		}
 		invitation.status = InvitationStatus.ACCEPTED
 		val membership = membershipRepository.save(
-			Membership(user = user, organization = invitation.organization, role = invitation.role),
+			Membership(user = user, organization = invitation.organization, roles = invitation.roles.toMutableSet()),
 		)
 		return tokenService.issue(user, membership)
 	}

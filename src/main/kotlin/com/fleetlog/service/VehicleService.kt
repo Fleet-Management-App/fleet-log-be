@@ -25,7 +25,7 @@ class VehicleService(
 
 	fun create(request: VehicleCreateRequest): VehicleResponse {
 		val tenantId = currentUser.getTenantId()
-		if (currentUser.getPrincipal().role != Role.FLEET_MANAGER) throw AccessDeniedException("Fleet Manager role required")
+		if (!currentUser.getPrincipal().hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Fleet Manager role required")
 		if (vehicleRepository.existsByOrganizationIdAndPlate(tenantId, request.plate)) {
 			throw ConflictException("A vehicle with this plate already exists")
 		}

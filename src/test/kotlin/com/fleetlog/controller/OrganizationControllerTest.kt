@@ -1,7 +1,6 @@
 package com.fleetlog.controller
 
 import com.fleetlog.BaseFleetLogBeIntegrationTest
-import com.fleetlog.dto.ChangeRoleRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.dto.MemberResponse
 import com.fleetlog.entity.Role
@@ -9,6 +8,7 @@ import com.fleetlog.fixtures.Accounts
 import com.fleetlog.fixtures.Accounts.uniqueEmail
 import com.fleetlog.fixtures.asRole
 import com.fleetlog.fixtures.withBearer
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -27,7 +27,7 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 
 			val active = Accounts.getMe(token).activeOrganization.shouldNotBeNull()
 			active.organizationName shouldBe "Demo Fleet"
-			active.role shouldBe Role.FLEET_MANAGER
+			active.roles shouldBe setOf(Role.FLEET_MANAGER)
 		}
 	}
 
@@ -61,6 +61,19 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 				statusCode(HttpStatus.FORBIDDEN.value())
 			}
 		}
+
+		it("let in a member who is a Driver and a Fleet Manager at once") {
+			val driverAndFleetManager = Accounts.memberOf(Accounts.createOrganization(), setOf(Role.DRIVER, Role.FLEET_MANAGER))
+
+			Accounts.getActiveRoles(driverAndFleetManager) shouldContainExactlyInAnyOrder listOf(Role.DRIVER, Role.FLEET_MANAGER)
+			Given {
+				withBearer(driverAndFleetManager)
+			} When {
+				get("/api/organization/members")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			}
+		}
 	}
 
 	describe("invitations") {
@@ -73,7 +86,7 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			Accounts.getMe(newcomer).pendingInvitations shouldHaveSize 1
 
 			val joined = Accounts.accept(newcomer, invitationId)
-			Accounts.getMe(joined).activeOrganization.shouldNotBeNull().role shouldBe Role.DRIVER
+			Accounts.getActiveRoles(joined) shouldBe setOf(Role.DRIVER)
 
 			val members = Given {
 				withBearer(fleetManager)
@@ -93,11 +106,21 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			Accounts.memberOf(fleetManager, Role.DRIVER, email)
 
 			Given {
-				withBearer(fleetManager).body(CreateInvitationRequest(email, Role.ACCOUNTANT))
+				withBearer(fleetManager).body(CreateInvitationRequest(email, setOf(Role.ACCOUNTANT)))
 			} When {
 				post("/api/organization/invitations")
 			} Then {
 				statusCode(HttpStatus.CONFLICT.value())
+			}
+		}
+
+		it("refuses an invitation without a role") {
+			Given {
+				withBearer(Accounts.createOrganization()).body(CreateInvitationRequest(uniqueEmail(), emptySet()))
+			} When {
+				post("/api/organization/invitations")
+			} Then {
+				statusCode(HttpStatus.BAD_REQUEST.value())
 			}
 		}
 
@@ -140,13 +163,8 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			val otherFleetManager = Accounts.createOrganization()
 			val otherDriverId = Accounts.getUserId(Accounts.memberOf(otherFleetManager, Role.DRIVER))
 
-			Given {
-				withBearer(Accounts.createOrganization()).body(ChangeRoleRequest(Role.FLEET_MANAGER))
-			} When {
-				patch("/api/organization/members/$otherDriverId")
-			} Then {
-				statusCode(HttpStatus.NOT_FOUND.value())
-			}
+			Accounts.changeRoles(Accounts.createOrganization(), otherDriverId, setOf(Role.FLEET_MANAGER))
+				.statusCode(HttpStatus.NOT_FOUND.value())
 		}
 
 		it("doesn't let a Fleet Manager revoke another organization's invitation") {
@@ -189,13 +207,10 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 				statusCode(HttpStatus.FORBIDDEN.value())
 			}
 
-			Given {
-				withBearer(fleetManager).body(ChangeRoleRequest(Role.FLEET_MANAGER))
-			} When {
-				patch("/api/organization/members/${Accounts.getUserId(driver)}")
-			} Then {
-				statusCode(HttpStatus.OK.value())
-			}
+			val changed = Accounts.changeRoles(fleetManager, Accounts.getUserId(driver), setOf(Role.DRIVER, Role.FLEET_MANAGER))
+				.statusCode(HttpStatus.OK.value())
+				.extract().`as`(MemberResponse::class.java)
+			changed.roles shouldBe setOf(Role.DRIVER, Role.FLEET_MANAGER)
 
 			Given {
 				withBearer(driver)
@@ -206,16 +221,28 @@ class OrganizationControllerTest : BaseFleetLogBeIntegrationTest({
 			}
 		}
 
-		it("refuses to demote the last Fleet Manager") {
+		it("refuses to take Fleet Manager away from the last one, even if they keep another role") {
 			val fleetManager = Accounts.createOrganization()
 
-			Given {
-				withBearer(fleetManager).body(ChangeRoleRequest(Role.DRIVER))
-			} When {
-				patch("/api/organization/members/${Accounts.getUserId(fleetManager)}")
-			} Then {
-				statusCode(HttpStatus.CONFLICT.value())
-			}
+			Accounts.changeRoles(fleetManager, Accounts.getUserId(fleetManager), setOf(Role.DRIVER))
+				.statusCode(HttpStatus.CONFLICT.value())
+		}
+
+		it("lets a Fleet Manager step down to Driver once someone else is a Fleet Manager") {
+			val fleetManager = Accounts.createOrganization()
+			Accounts.memberOf(fleetManager, Role.FLEET_MANAGER)
+
+			Accounts.changeRoles(fleetManager, Accounts.getUserId(fleetManager), setOf(Role.DRIVER))
+				.statusCode(HttpStatus.OK.value())
+			Accounts.getActiveRoles(fleetManager) shouldBe setOf(Role.DRIVER)
+		}
+
+		it("refuses an empty set of roles") {
+			val fleetManager = Accounts.createOrganization()
+			val driverId = Accounts.getUserId(Accounts.memberOf(fleetManager, Role.DRIVER))
+
+			Accounts.changeRoles(fleetManager, driverId, emptySet())
+				.statusCode(HttpStatus.BAD_REQUEST.value())
 		}
 
 		it("removes a member's access but keeps their account") {

@@ -9,7 +9,7 @@ data class IncomingInvitationResponse(
 	val id: UUID,
 	val organizationId: UUID,
 	val organizationName: String,
-	val role: Role,
+	val roles: Set<Role>,
 	val invitedByName: String,
 	val createdAt: Instant,
 )

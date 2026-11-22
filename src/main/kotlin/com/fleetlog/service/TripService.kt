@@ -80,10 +80,12 @@ class TripService(
 	@Transactional(readOnly = true)
 	fun list(status: TripStatus?): List<TripResponse> {
 		val tenantId = currentUser.getTenantId()
-		val trips = when (currentUser.getPrincipal().role) {
-			Role.FLEET_MANAGER -> tripRepository.findAllByOrganizationIdOrderByCreatedAt(tenantId)
-			Role.DRIVER -> tripRepository.findAllByOrganizationIdAndDriverIdOrderByCreatedAt(tenantId, currentUser.getUserId())
-			Role.ACCOUNTANT, null -> throw AccessDeniedException("Not permitted to view trips")
+		val principal = currentUser.getPrincipal()
+		// A member holding several roles gets the widest view any of them grants.
+		val trips = when {
+			principal.hasRole(Role.FLEET_MANAGER) -> tripRepository.findAllByOrganizationIdOrderByCreatedAt(tenantId)
+			principal.hasRole(Role.DRIVER) -> tripRepository.findAllByOrganizationIdAndDriverIdOrderByCreatedAt(tenantId, currentUser.getUserId())
+			else -> throw AccessDeniedException("Not permitted to view trips")
 		}
 		return trips.filter { status == null || it.status == status }.map(tripMapper::toResponse)
 	}
@@ -155,21 +157,22 @@ class TripService(
 	/** Driver sees/acts on own trips only; Fleet Manager on any trip in the tenant; Accountant never. */
 	private fun findVisible(tripId: UUID): Trip {
 		val trip = findInTenant(tripId)
-		when (currentUser.getPrincipal().role) {
-			Role.FLEET_MANAGER -> {}
-			Role.DRIVER -> if (trip.driver.id != currentUser.getUserId()) throw AccessDeniedException("Not your trip")
-			Role.ACCOUNTANT, null -> throw AccessDeniedException("Not permitted on trips")
+		val principal = currentUser.getPrincipal()
+		when {
+			principal.hasRole(Role.FLEET_MANAGER) -> {}
+			principal.hasRole(Role.DRIVER) -> if (trip.driver.id != currentUser.getUserId()) throw AccessDeniedException("Not your trip")
+			else -> throw AccessDeniedException("Not permitted on trips")
 		}
 		return trip
 	}
 
 	private fun requireDriverOrFleetManager() {
-		val role = currentUser.getPrincipal().role
-		if (role != Role.DRIVER && role != Role.FLEET_MANAGER) throw AccessDeniedException("Not permitted on trips")
+		val principal = currentUser.getPrincipal()
+		if (!principal.hasRole(Role.DRIVER) && !principal.hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Not permitted on trips")
 	}
 
 	private fun requireFleetManager() {
-		if (currentUser.getPrincipal().role != Role.FLEET_MANAGER) throw AccessDeniedException("Fleet Manager role required")
+		if (!currentUser.getPrincipal().hasRole(Role.FLEET_MANAGER)) throw AccessDeniedException("Fleet Manager role required")
 	}
 
 	/** Looks the vehicle up in the tenant and enforces BR-01 (suspended or STK-expired vehicles can't be (re)selected). */

@@ -457,6 +457,25 @@ class TripControllerTest : BaseFleetLogBeIntegrationTest({
 			allTrips shouldHaveSize 2
 		}
 
+		it("lists every trip for a member who is a Driver and a Fleet Manager at once") {
+			val fleetManager = Accounts.createOrganization()
+			val vehicleId = Vehicles.createVehicleId(fleetManager)
+			val driverAndFleetManager = Accounts.memberOf(fleetManager, setOf(Role.DRIVER, Role.FLEET_MANAGER))
+			Trips.createTrip(fleetManager, vehicleId)
+			Trips.createTrip(driverAndFleetManager, vehicleId)
+
+			val trips = Given {
+				withBearer(driverAndFleetManager)
+			} When {
+				get("/api/trips")
+			} Then {
+				statusCode(HttpStatus.OK.value())
+			} Extract {
+				`as`(Array<TripResponse>::class.java).toList()
+			}
+			trips shouldHaveSize 2
+		}
+
 		it("returns 403 for an Accountant listing or reading trips") {
 			val fleetManager = Accounts.createOrganization()
 			val tripId = Trips.createTripId(fleetManager, Vehicles.createVehicleId(fleetManager))

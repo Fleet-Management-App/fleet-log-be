@@ -7,5 +7,5 @@ import java.util.UUID
 data class MembershipResponse(
 	val organizationId: UUID,
 	val organizationName: String,
-	val role: Role,
+	val roles: Set<Role>,
 )

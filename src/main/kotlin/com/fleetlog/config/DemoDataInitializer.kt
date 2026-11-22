@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional
  * Demo accounts for presenting the app (DEMO_DATA_ENABLED=true). All passwords are [DEMO_PASSWORD].
  *
  * - "Demo Fleet s.r.o.": jana (Fleet Manager), petr (Driver), eva (Accountant)
- * - "Horská doprava a.s.": tomas (Fleet Manager) and jana as a Driver, to show that a role belongs
- *   to the membership, not to the account; petr has a pending invitation there
+ * - "Horská doprava a.s.": tomas (Fleet Manager who also drives) and jana as a Driver, to show that
+ *   roles belong to the membership, not to the account; petr has a pending invitation there
  *
  * Runs once: skipped when the demo Fleet Manager already exists.
  */
@@ -54,14 +54,14 @@ class DemoDataInitializer(
 
 		membershipRepository.saveAll(
 			listOf(
-				Membership(user = jana, organization = demoFleet, role = Role.FLEET_MANAGER),
-				Membership(user = petr, organization = demoFleet, role = Role.DRIVER),
-				Membership(user = eva, organization = demoFleet, role = Role.ACCOUNTANT),
-				Membership(user = tomas, organization = horska, role = Role.FLEET_MANAGER),
-				Membership(user = jana, organization = horska, role = Role.DRIVER),
+				Membership(user = jana, organization = demoFleet, roles = mutableSetOf(Role.FLEET_MANAGER)),
+				Membership(user = petr, organization = demoFleet, roles = mutableSetOf(Role.DRIVER)),
+				Membership(user = eva, organization = demoFleet, roles = mutableSetOf(Role.ACCOUNTANT)),
+				Membership(user = tomas, organization = horska, roles = mutableSetOf(Role.FLEET_MANAGER, Role.DRIVER)),
+				Membership(user = jana, organization = horska, roles = mutableSetOf(Role.DRIVER)),
 			),
 		)
-		invitationRepository.save(Invitation(organization = horska, email = petr.email, role = Role.DRIVER, invitedBy = tomas))
+		invitationRepository.save(Invitation(organization = horska, email = petr.email, roles = setOf(Role.DRIVER), invitedBy = tomas))
 
 		log.info("Demo data created; log in as jana|petr|eva|tomas@demo.fleetlog.app with password '{}'", DEMO_PASSWORD)
 	}

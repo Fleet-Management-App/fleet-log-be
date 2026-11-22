@@ -1,7 +1,7 @@
 package com.fleetlog.service
 
 import com.fleetlog.dto.AuthTokenResponse
-import com.fleetlog.dto.ChangeRoleRequest
+import com.fleetlog.dto.ChangeRolesRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.dto.CreateOrganizationRequest
 import com.fleetlog.dto.InvitationResponse
@@ -42,7 +42,7 @@ class OrganizationService(
 	fun create(request: CreateOrganizationRequest): AuthTokenResponse {
 		val user = userRepository.findById(currentUser.getUserId()).orElseThrow { NotFoundException("Account not found") }
 		val organization = organizationRepository.save(Organization(name = request.name.trim()))
-		val membership = membershipRepository.save(Membership(user = user, organization = organization, role = Role.FLEET_MANAGER))
+		val membership = membershipRepository.save(Membership(user = user, organization = organization, roles = mutableSetOf(Role.FLEET_MANAGER)))
 		return tokenService.issue(user, membership)
 	}
 
@@ -51,10 +51,11 @@ class OrganizationService(
 		membershipRepository.findAllByOrganizationIdOrderByCreatedAt(currentUser.getTenantId())
 			.map(organizationMapper::toMemberResponse)
 
-	fun changeRole(userId: UUID, request: ChangeRoleRequest): MemberResponse {
+	fun changeRoles(userId: UUID, request: ChangeRolesRequest): MemberResponse {
 		val membership = findMember(userId)
-		if (request.role != Role.FLEET_MANAGER) ensureNotLastFleetManager(membership)
-		membership.role = request.role
+		if (Role.FLEET_MANAGER !in request.roles) ensureNotLastFleetManager(membership)
+		membership.roles.clear()
+		membership.roles.addAll(request.roles)
 		return organizationMapper.toMemberResponse(membership)
 	}
 
@@ -79,7 +80,7 @@ class OrganizationService(
 			Invitation(
 				organization = organizationRepository.getReferenceById(tenantId),
 				email = email,
-				role = request.role,
+				roles = request.roles,
 				invitedBy = userRepository.getReferenceById(currentUser.getUserId()),
 			),
 		)
@@ -104,7 +105,7 @@ class OrganizationService(
 
 	// Not in the Business Rules page yet (gap to flag): without a Fleet Manager nobody could manage the organization
 	private fun ensureNotLastFleetManager(membership: Membership) {
-		if (membership.role == Role.FLEET_MANAGER &&
+		if (Role.FLEET_MANAGER in membership.roles &&
 			membershipRepository.countByOrganizationIdAndRole(membership.organization.id, Role.FLEET_MANAGER) <= 1
 		) {
 			throw ConflictException("The organization needs at least one Fleet Manager")

@@ -1,5 +1,6 @@
 package com.fleetlog.fixtures
 
+import com.fleetlog.dto.ChangeRolesRequest
 import com.fleetlog.dto.CreateInvitationRequest
 import com.fleetlog.dto.CreateOrganizationRequest
 import com.fleetlog.dto.LoginRequest
@@ -10,6 +11,7 @@ import io.restassured.module.kotlin.extensions.Extract
 import io.restassured.module.kotlin.extensions.Given
 import io.restassured.module.kotlin.extensions.Then
 import io.restassured.module.kotlin.extensions.When
+import io.restassured.response.ValidatableResponse
 import io.restassured.specification.RequestSpecification
 import java.util.UUID
 
@@ -44,7 +46,10 @@ object Accounts {
 		} Extract { path("accessToken") }
 
 	fun invite(fleetManagerToken: String, role: Role, email: String = uniqueEmail(role.name.lowercase())): String =
-		Given { withBearer(fleetManagerToken).body(CreateInvitationRequest(email, role)) } When {
+		invite(fleetManagerToken, setOf(role), email)
+
+	fun invite(fleetManagerToken: String, roles: Set<Role>, email: String = uniqueEmail(roles.first().name.lowercase())): String =
+		Given { withBearer(fleetManagerToken).body(CreateInvitationRequest(email, roles)) } When {
 			post("/api/organization/invitations")
 		} Then {
 			statusCode(201)
@@ -59,7 +64,11 @@ object Accounts {
 
 	/** A new account joining [fleetManagerToken]'s organization with [role]. */
 	fun memberOf(fleetManagerToken: String, role: Role, email: String = uniqueEmail(role.name.lowercase())): String =
-		accept(signUp(email), invite(fleetManagerToken, role, email))
+		memberOf(fleetManagerToken, setOf(role), email)
+
+	/** A new account joining [fleetManagerToken]'s organization holding all of [roles] at once. */
+	fun memberOf(fleetManagerToken: String, roles: Set<Role>, email: String = uniqueEmail(roles.first().name.lowercase())): String =
+		accept(signUp(email), invite(fleetManagerToken, roles, email))
 
 	/**
 	 * A caller with [role] — in a brand-new organization of their own, unless [organizationOf] (any
@@ -81,6 +90,15 @@ object Accounts {
 
 	fun getActiveOrganizationId(token: String): String =
 		requireNotNull(getMe(token).activeOrganization).organizationId.toString()
+
+	/** The caller's roles in the active organization, as /api/me reports them. */
+	fun getActiveRoles(token: String): Set<Role> = requireNotNull(getMe(token).activeOrganization).roles.toSet()
+
+	/** Replaces a member's roles; the caller asserts the status. */
+	fun changeRoles(fleetManagerToken: String, userId: String, roles: Set<Role>): ValidatableResponse =
+		Given { withBearer(fleetManagerToken).body(ChangeRolesRequest(roles)) } When {
+			put("/api/organization/members/$userId/roles")
+		} Then { this }
 
 }
 

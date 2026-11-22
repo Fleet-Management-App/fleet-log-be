@@ -11,7 +11,10 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import org.springframework.stereotype.Service
 import java.time.Instant
 
-/** Issues the API's JWTs. The active organization and the role in it travel as claims. */
+/**
+ * Issues the API's JWTs. The active organization travels as a claim; the roles in it do not, they
+ * are looked up per request (see [FleetLogJwtConverter]).
+ */
 @Service
 class TokenService(
 	private val jwtEncoder: JwtEncoder,
@@ -28,10 +31,7 @@ class TokenService(
 			.expiresAt(expiresAt)
 			.claim(EMAIL_CLAIM, user.email)
 			.apply {
-				if (activeMembership != null) {
-					claim(TENANT_CLAIM, activeMembership.organization.id.toString())
-					claim(ROLE_CLAIM, activeMembership.role.name)
-				}
+				if (activeMembership != null) claim(TENANT_CLAIM, activeMembership.organization.id.toString())
 			}
 			.build()
 		val header = JwsHeader.with(MacAlgorithm.HS256).build()
@@ -43,7 +43,6 @@ class TokenService(
 		const val ISSUER = "fleetlog"
 		const val EMAIL_CLAIM = "email"
 		const val TENANT_CLAIM = "tenant_id"
-		const val ROLE_CLAIM = "role"
 	}
 
 }
